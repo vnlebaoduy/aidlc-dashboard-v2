@@ -191,8 +191,6 @@ same. Every string lives in a typed catalogue
 typecheck failure rather than a blank label. Workspace text — headings, file names,
 feedback — is always quoted verbatim and never translated.
 
-A short Vietnamese overview is at the end of this file.
-
 ## Theme
 
 Light, dark or follow-OS, stored per browser. The palette, spacing, motion and
@@ -271,26 +269,3 @@ badges above track releases, downloads and activity.
 
 [MIT](LICENSE) © 2026 Le Bao Duy
 
----
-
-## Tiếng Việt
-
-**AI-DLC Dashboard v2** là bảng điều khiển web chỉ đọc cho một run AI-DLC v2: trạng
-thái, tiến độ, điểm đang chờ bạn xử lý, thời gian, quyết định còn treo và chi phí sử
-dụng. Dashboard **không ghi gì vào workspace** — chỉ ghi `data/usage.db` và
-`data/recent-workspaces.json` nằm ngoài workspace. Server mặc định chỉ nghe loopback
-và **không có xác thực**.
-
-Yêu cầu: [Bun](https://bun.sh) 1.4+ và một workspace AI-DLC **v2** (chứa `aidlc/` với
-record của intent). Chỉ hỗ trợ v2; bản v1 dùng
-[wowzoo/aidlc-dashboard](https://github.com/wowzoo/aidlc-dashboard).
-
-```bash
-bun install && (cd web && bun install)
-bun run build
-bun run start -- --root ~/duong/dan/workspace   # http://127.0.0.1:4321
-```
-
-Giao diện có **tiếng Anh** và **tiếng Việt**: dùng `?lang=vi` một lần, cookie sẽ ghi
-nhớ lựa chọn (hoặc chọn ở menu ngôn ngữ trên header). Theme sáng/tối/theo hệ thống.
-Đóng góp: xem [`CONTRIBUTING.md`](CONTRIBUTING.md). Giấy phép: [MIT](LICENSE).
