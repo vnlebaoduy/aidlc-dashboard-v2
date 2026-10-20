@@ -1,0 +1,4 @@
+# `[test] root` scopes test discovery to server/ so `bun test` never picks up the
+# web client or anything else outside the data layer.
+[test]
+root = "server"

@@ -1,0 +1,38 @@
+{
+  "name": "aidlc-dashboard-v2",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@types/bun": "1.4.2",
+    "typescript": "^5.4.0"
+  },
+  "description": "Read-only web dashboard for an AI-DLC v2 run: status, progress, blockers, timing and usage.",
+  "license": "MIT",
+  "author": "Le Bao Duy",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vnlebaoduy/aidlc-dashboard-v2.git"
+  },
+  "homepage": "https://github.com/vnlebaoduy/aidlc-dashboard-v2#readme",
+  "bugs": {
+    "url": "https://github.com/vnlebaoduy/aidlc-dashboard-v2/issues"
+  },
+  "keywords": ["ai-dlc", "dashboard", "bun", "react", "tanstack", "observability"],
+  "engines": {
+    "bun": ">=1.4.0"
+  },
+  "scripts": {
+    "dev": "bun run scripts/dev.ts",
+    "dev:server": "bun --watch server/server.ts",
+    "dev:web": "cd web && bun run dev",
+    "build": "cd web && bun run build",
+    "start": "bun run server/server.ts",
+    "typecheck": "bunx tsc -p server --noEmit && cd web && bunx tsc -b",
+    "lint": "bunx --bun @biomejs/biome check server/ scripts/ web/src/",
+    "format": "bunx --bun @biomejs/biome format --write server/ scripts/ web/src/",
+    "test": "bun test",
+    "verify": "bun run typecheck && bun run lint && bun test && bun run build"
+  }
+}
