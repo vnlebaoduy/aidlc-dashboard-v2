@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/vnlebaoduy/aidlc-dashboard-v2/security/advisories/new
+    about: Report privately. Never open a public issue for a vulnerability.
+  - name: How to contribute
+    url: https://github.com/vnlebaoduy/aidlc-dashboard-v2/blob/main/CONTRIBUTING.md
+    about: Development setup, design and copy rules, the verification gate.
+  - name: AI-DLC v1 dashboard
+    url: https://github.com/wowzoo/aidlc-dashboard
+    about: This repository supports AI-DLC v2 only.

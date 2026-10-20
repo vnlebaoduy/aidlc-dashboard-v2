@@ -1,0 +1,67 @@
+name: Feature request
+description: Propose a page, panel, signal or behaviour.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This dashboard is organised by the question a page answers. Describing the
+        question first makes a proposal much easier to evaluate.
+  - type: textarea
+    id: question
+    attributes:
+      label: What question should the dashboard answer?
+      description: One sentence, as a reader would ask it.
+      placeholder: Which unit is holding the stage up, and for how long?
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is missing or painful today?
+      description: What you do instead now, and why that does not work.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Where it would live (page or panel), what it would show, and the source of the data.
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing pages, API fields, or external tools that already cover part of this.
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Overview
+        - Stages and units
+        - Timeline
+        - Decisions
+        - Usage and credit
+        - Sources and warnings
+        - Workspace picker
+        - File viewer and Markdown/Mermaid
+        - Notifications
+        - Language or theme
+        - Server or API
+        - Documentation
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: This is about AI-DLC v2 records; v1 behaviour belongs to the v1 dashboard.
+          required: true
+        - label: I searched existing issues and discussions for this idea.
+          required: true

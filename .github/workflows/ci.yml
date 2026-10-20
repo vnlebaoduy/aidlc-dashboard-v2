@@ -1,0 +1,34 @@
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install server dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install web dependencies
+        run: bun install --frozen-lockfile
+        working-directory: web
+
+      - name: Typecheck, lint, test and build
+        run: bun run verify

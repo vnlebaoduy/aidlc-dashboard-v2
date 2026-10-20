@@ -1,0 +1,45 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile
+          cd web && bun install --frozen-lockfile
+
+      - name: Verify and build
+        run: bun run verify
+
+      - name: Package the runnable app
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          tar -czf "aidlc-dashboard-v2-${version}.tar.gz" \
+            --exclude='node_modules' \
+            --exclude='web/node_modules' \
+            server web/dist package.json bun.lock README.md LICENSE
+          sha256sum "aidlc-dashboard-v2-${version}.tar.gz" > "aidlc-dashboard-v2-${version}.tar.gz.sha256"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "AI-DLC Dashboard v2 $GITHUB_REF_NAME" \
+            --generate-notes \
+            "aidlc-dashboard-v2-${GITHUB_REF_NAME#v}.tar.gz" \
+            "aidlc-dashboard-v2-${GITHUB_REF_NAME#v}.tar.gz.sha256"

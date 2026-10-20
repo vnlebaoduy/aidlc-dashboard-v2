@@ -1,0 +1,93 @@
+name: Bug report
+description: Report something that breaks, shows the wrong number, or looks wrong.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please remove anything private from a workspace path,
+        file name or screenshot before posting.
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      description: The behaviour or number you expected, and why.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened?
+      description: What the dashboard actually did. Include the exact wording of any error.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: From launching the server to the page and click.
+      placeholder: |
+        1. bun run dev -- --root fixtures/reference
+        2. Open /timeline
+        3. Click ...
+    validations:
+      required: true
+  - type: input
+    id: reproduction
+    attributes:
+      label: Reproduction workspace
+      description: Is this visible with `fixtures/reference`, or does it need a particular record shape?
+      placeholder: fixtures/reference — or describe the record shape
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Overview
+        - Stages and units
+        - Timeline
+        - Decisions
+        - Usage and credit
+        - Sources and warnings
+        - Workspace picker
+        - File viewer and Markdown/Mermaid
+        - Notifications
+        - Language or theme
+        - Server, API or security guard
+        - Build, tests or tooling
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Dashboard version
+      description: From `/api/meta`, or the release tag.
+      placeholder: 2.0.0
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Bun, OS and browser
+      placeholder: Bun 1.4.2, Ubuntu 24.04, Chrome 141
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots or logs
+      description: Screenshots at the width where it appears, and any server output. Paste text rather than linking to a private host.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed private workspace content from this report.
+          required: true
+        - label: I searched existing issues for the same problem.
+          required: true
