@@ -63,5 +63,5 @@ body:
       options:
         - label: This is about AI-DLC v2 records; v1 behaviour belongs to the v1 dashboard.
           required: true
-        - label: I searched existing issues and discussions for this idea.
+        - label: I searched existing issues for this idea.
           required: true
