@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="web/public/logo.png" width="88" alt="AI-DLC Dashboard logo">
-</p>
-
 <h1 align="center">AI-DLC Dashboard v2</h1>
 
 <p align="center">An honest, at-a-glance read of an AI-DLC v2 run.</p>
