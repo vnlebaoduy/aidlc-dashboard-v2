@@ -1,0 +1,16 @@
+{
+  "name": "aidlc-ledger",
+  "source": {
+    "type": "git",
+    "url": "https://github.com/vnlebaoduy/aidlc-dashboard-v2",
+    "ref": "main",
+    "subdir": "apps/kirocrew"
+  },
+  "author": {
+    "name": "vnlebaoduy",
+    "url": "https://github.com/vnlebaoduy",
+    "kind": "person"
+  },
+  "categories": ["developer-tools"],
+  "note": "AI-DLC v2 run analysis: what needs you, artifact coverage, reviewer verdicts, timing and cost provenance. Read-only; the only write path is an owner-confirmed answer to an open gate. By Le Bao Duy, MIT."
+}

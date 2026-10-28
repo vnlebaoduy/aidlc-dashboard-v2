@@ -1,7 +1,7 @@
 // apps/kirocrew/backend/src/server.ts
-import * as fs28 from "node:fs";
+import * as fs29 from "node:fs";
 import { createServer } from "node:http";
-import * as path25 from "node:path";
+import * as path26 from "node:path";
 
 // server/model/assemble.ts
 import * as fs26 from "node:fs";
@@ -4448,10 +4448,256 @@ function readArtifactSource(recordDir, rel) {
   }
 }
 
+// apps/kirocrew/backend/src/chat.ts
+import * as fs28 from "node:fs";
+import * as path25 from "node:path";
+function base() {
+  const explicit = process.env.AIDLC_LEDGER_CHAT_BASE?.trim();
+  if (explicit)
+    return explicit;
+  const origin = process.env.KIROCREW_GATEWAY_ORIGIN?.trim();
+  return origin && origin.length > 0 ? origin : undefined;
+}
+var cachedToken;
+function appSecret() {
+  const home = process.env.KIROCREW_HOME?.trim();
+  const name = process.env.KIROCREW_APP_NAME?.trim() || "aidlc-ledger";
+  if (!home)
+    return;
+  try {
+    const secret = fs28.readFileSync(path25.join(home, "apps", name, ".app_secret"), "utf-8").trim();
+    return secret.length > 0 ? secret : undefined;
+  } catch {
+    return;
+  }
+}
+async function tokenFor(origin) {
+  if (cachedToken?.origin === origin)
+    return cachedToken.token;
+  const secret = appSecret();
+  if (!secret)
+    return;
+  const name = process.env.KIROCREW_APP_NAME?.trim() || "aidlc-ledger";
+  try {
+    const res = await fetch(`${origin}/api/apps/${encodeURIComponent(name)}/token`, {
+      method: "POST",
+      headers: { "x-app-secret": secret, "content-type": "application/json" }
+    });
+    if (!res.ok)
+      return;
+    const body = await res.json();
+    const token = typeof body === "object" && body !== null && "token" in body && typeof body.token === "string" ? body.token : undefined;
+    if (!token)
+      return;
+    cachedToken = { origin, token };
+    return token;
+  } catch {
+    return;
+  }
+}
+function cookieFor(origin, token) {
+  try {
+    const port = new URL(origin).port || "80";
+    return `mc_token_${port}=${token}`;
+  } catch {
+    return `mc_token_5476=${token}`;
+  }
+}
+async function authHeaders(origin) {
+  const token = await tokenFor(origin);
+  return token ? { cookie: cookieFor(origin, token) } : undefined;
+}
+function slotOf(value) {
+  if (typeof value !== "object" || value === null)
+    return;
+  const key = "key" in value && typeof value.key === "string" ? value.key : undefined;
+  if (!key)
+    return;
+  const text = (name) => {
+    if (!(name in value))
+      return;
+    const field = Reflect.get(value, name);
+    return typeof field === "string" && field.length > 0 ? field : undefined;
+  };
+  const title = text("title");
+  const project = text("project");
+  const agent = text("agent");
+  return {
+    key,
+    ...title ? { title } : {},
+    ...project ? { project } : {},
+    ...agent ? { agent } : {}
+  };
+}
+async function listSlots() {
+  const origin = base();
+  if (!origin)
+    return;
+  try {
+    const auth = await authHeaders(origin);
+    if (!auth)
+      return;
+    const res = await fetch(`${origin}/api/chat/slots`, {
+      headers: { accept: "application/json", ...auth }
+    });
+    if (!res.ok)
+      return;
+    const body = await res.json();
+    const rows = Array.isArray(body) ? body : typeof body === "object" && body !== null && ("slots" in body) && Array.isArray(body.slots) ? body.slots : undefined;
+    if (!rows)
+      return;
+    return rows.map(slotOf).filter((slot) => slot !== undefined);
+  } catch {
+    return;
+  }
+}
+function slotForWorkspace(slots, root) {
+  const normalise = (value) => value.replace(/\/+$/, "");
+  const wanted = normalise(root);
+  const exact = slots.find((slot) => slot.project !== undefined && normalise(slot.project) === wanted);
+  if (exact)
+    return exact;
+  return slots.find((slot) => slot.project !== undefined && normalise(slot.project).startsWith(`${wanted}/`));
+}
+async function sendChat(input) {
+  const origin = base();
+  if (!origin)
+    return { ok: false, detail: "no-gateway" };
+  try {
+    const auth = await authHeaders(origin);
+    if (!auth)
+      return { ok: false, detail: "no-app-token" };
+    const res = await fetch(`${origin}/api/chat`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "text/event-stream, application/json",
+        ...auth
+      },
+      body: JSON.stringify({
+        message: input.message,
+        slot: input.slot,
+        meta: { sendId: input.sendId }
+      })
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return { ok: false, status: res.status, detail: text.slice(0, 300) || "refused" };
+    }
+    await res.body?.cancel().catch(() => {
+      return;
+    });
+    return { ok: true, status: res.status, slot: input.slot };
+  } catch (err) {
+    return { ok: false, detail: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// apps/kirocrew/backend/src/decisions.ts
+var MAX_TEXT = 8000;
+function composeAnswer(draft) {
+  if (draft.choice === "approve")
+    return "Approved.";
+  if (draft.choice === "request-changes") {
+    const feedback = draft.feedback?.trim() ?? "";
+    return feedback.length > 0 ? `Request changes: ${feedback}` : "";
+  }
+  return draft.answer?.trim() ?? "";
+}
+function validateDraft(draft) {
+  const problems = [];
+  if (draft.stage.trim().length === 0)
+    problems.push("missing-stage");
+  const text = composeAnswer(draft);
+  if (text.length === 0)
+    problems.push(draft.choice === "request-changes" ? "missing-feedback" : "missing-answer");
+  if (text.length > MAX_TEXT)
+    problems.push("answer-too-long");
+  return problems;
+}
+function beginSend(existing, next) {
+  if (existing && existing.sendId === next.sendId) {
+    return { send: false, record: existing };
+  }
+  return { send: true, record: { ...next, status: "pending" } };
+}
+function markDelivered(record) {
+  if (record.status !== "pending")
+    return record;
+  return { ...record, status: "delivered" };
+}
+function markUncertain(record, reason) {
+  if (record.status === "resolved" || record.status === "refused")
+    return record;
+  return { ...record, status: "uncertain", detail: reason };
+}
+function markRefused(record, code) {
+  if (record.status === "resolved")
+    return record;
+  return { ...record, status: "refused", detail: code };
+}
+
 // apps/kirocrew/backend/src/server.ts
 var BASE = "/api/apps/aidlc-ledger";
 var PORT = Number(process.env.PORT ?? 0);
-var ROOT = process.env.AIDLC_LEDGER_ROOT?.trim() || undefined;
+var HERE = path26.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+var APP_ROOT = path26.join(HERE, "..", "..");
+var WORKSPACE_FILE = path26.join(APP_ROOT, "data", "workspace.json");
+function storedRoot() {
+  try {
+    const doc = JSON.parse(fs29.readFileSync(WORKSPACE_FILE, "utf-8"));
+    if (typeof doc !== "object" || doc === null || !("root" in doc))
+      return;
+    return typeof doc.root === "string" && doc.root.trim().length > 0 ? doc.root.trim() : undefined;
+  } catch {
+    return;
+  }
+}
+var sends = new Map;
+function draftOf(value) {
+  if (typeof value !== "object" || value === null)
+    return;
+  const pick = (name) => {
+    if (!(name in value))
+      return;
+    const field = Reflect.get(value, name);
+    return typeof field === "string" ? field : undefined;
+  };
+  const stage = pick("stage");
+  const choice = pick("choice");
+  if (!stage || choice !== "approve" && choice !== "request-changes" && choice !== "answer") {
+    return;
+  }
+  const unit = pick("unit");
+  const feedback = pick("feedback");
+  const answer = pick("answer");
+  return {
+    stage,
+    choice,
+    ...unit ? { unit } : {},
+    ...feedback ? { feedback } : {},
+    ...answer ? { answer } : {}
+  };
+}
+async function readBody(req) {
+  return new Promise((resolve) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 256 * 1024)
+        req.destroy();
+    });
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(body));
+      } catch {
+        resolve(undefined);
+      }
+    });
+    req.on("error", () => resolve(undefined));
+  });
+}
+var ROOT = process.env.AIDLC_LEDGER_ROOT?.trim() || storedRoot();
 
 class Refusal extends Error {
   code;
@@ -4473,7 +4719,7 @@ function json(res, status, body) {
 }
 function isWorkspace(root) {
   try {
-    return fs28.statSync(`${root}/aidlc`).isDirectory();
+    return fs29.statSync(`${root}/aidlc`).isDirectory();
   } catch {
     return false;
   }
@@ -4497,17 +4743,117 @@ function view(rel) {
   const resolved = resolveState(ROOT);
   if (resolved.kind !== "ok")
     throw new Refusal("no-run", 404);
-  const recordDir = path25.dirname(path25.join(ROOT, resolved.rel));
+  const recordDir = path26.dirname(path26.join(ROOT, resolved.rel));
   return readArtifactSource(artifactBase(ROOT, recordDir, rel), rel);
 }
-var server = createServer((req, res) => {
+var server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   if (url.pathname === "/health") {
     json(res, 200, { ok: true });
     return;
   }
-  if (req.method !== "GET" && req.method !== "HEAD") {
+  const writeRoute = req.method === "POST" && (url.pathname === `${BASE}/workspace` || url.pathname === `${BASE}/decisions/preview` || url.pathname === `${BASE}/decisions/send`);
+  if (!writeRoute && req.method !== "GET" && req.method !== "HEAD") {
     json(res, 405, { error: { code: "read-only" } });
+    return;
+  }
+  if (url.pathname === `${BASE}/mapping`) {
+    const slots = await listSlots();
+    if (!slots) {
+      json(res, 503, { error: { code: "no-gateway" } });
+      return;
+    }
+    const slot = ROOT ? slotForWorkspace(slots, ROOT) : undefined;
+    json(res, 200, {
+      slot: slot ? { key: slot.key, title: slot.title ?? null } : null,
+      count: slots.length
+    });
+    return;
+  }
+  if (url.pathname === `${BASE}/decisions` && req.method === "GET") {
+    json(res, 200, { records: [...sends.values()] });
+    return;
+  }
+  if (url.pathname === `${BASE}/decisions/preview` && req.method === "POST") {
+    const body = await readBody(req);
+    const draft = typeof body === "object" && body !== null && "draft" in body ? draftOf(body.draft) : draftOf(body);
+    if (!draft) {
+      json(res, 400, { error: { code: "invalid-decision" } });
+      return;
+    }
+    json(res, 200, { text: composeAnswer(draft), problems: validateDraft(draft) });
+    return;
+  }
+  if (url.pathname === `${BASE}/decisions/send` && req.method === "POST") {
+    const body = await readBody(req);
+    if (typeof body !== "object" || body === null || !("draft" in body)) {
+      json(res, 400, { error: { code: "invalid-decision" } });
+      return;
+    }
+    const draft = draftOf(body.draft);
+    if (!draft) {
+      json(res, 400, { error: { code: "invalid-decision" } });
+      return;
+    }
+    const problems = validateDraft(draft);
+    if (problems.length > 0) {
+      json(res, 400, { error: { code: "invalid-decision", problems } });
+      return;
+    }
+    const text = composeAnswer(draft);
+    const sendId = "sendId" in body && typeof body.sendId === "string" && body.sendId.length > 0 ? body.sendId : crypto.randomUUID();
+    const requestedSlot = "slot" in body && typeof body.slot === "string" && body.slot.length > 0 ? body.slot : undefined;
+    const started = beginSend(sends.get(sendId), { sendId, slotKey: "", text });
+    if (!started.send) {
+      json(res, 200, { record: started.record, replayed: true });
+      return;
+    }
+    let slot = requestedSlot;
+    if (!slot && ROOT) {
+      const slots = await listSlots();
+      slot = slots ? slotForWorkspace(slots, ROOT)?.key : undefined;
+    }
+    if (!slot) {
+      const refused = markRefused(started.record, "no-session");
+      sends.set(sendId, refused);
+      json(res, 409, { error: { code: "no-session" }, record: refused });
+      return;
+    }
+    const result = await sendChat({ message: text, slot, sendId });
+    const keyed = { ...started.record, slotKey: slot };
+    const record = result.ok ? markDelivered(keyed) : result.status !== undefined && result.status < 500 ? markRefused(keyed, `gateway-${result.status}`) : markUncertain(keyed, result.detail ?? "unconfirmed");
+    sends.set(sendId, record);
+    json(res, result.ok ? 200 : 502, { record, text });
+    return;
+  }
+  if (url.pathname === `${BASE}/workspace`) {
+    if (req.method === "POST") {
+      let body = "";
+      req.on("data", (chunk) => {
+        body += chunk;
+        if (body.length > 64 * 1024)
+          req.destroy();
+      });
+      req.on("end", () => {
+        try {
+          const doc = JSON.parse(body);
+          const root = typeof doc === "object" && doc !== null && "root" in doc && typeof doc.root === "string" ? doc.root.trim() : "";
+          if (!root || !isWorkspace(root)) {
+            json(res, 400, { error: { code: "not-a-workspace" } });
+            return;
+          }
+          fs29.mkdirSync(path26.dirname(WORKSPACE_FILE), { recursive: true });
+          fs29.writeFileSync(WORKSPACE_FILE, `${JSON.stringify({ root }, null, 2)}
+`);
+          ROOT = root;
+          json(res, 200, { root });
+        } catch {
+          json(res, 400, { error: { code: "bad-request" } });
+        }
+      });
+      return;
+    }
+    json(res, 200, { root: ROOT ?? null });
     return;
   }
   if (url.pathname === `${BASE}/meta`) {

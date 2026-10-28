@@ -1,6 +1,6 @@
 ---
 title: "Phase 2: Execution truth and state settings"
-status: todo
+status: completed
 ---
 
 # Phase 2: Execution truth and state settings
@@ -59,5 +59,5 @@ Make the dashboard read the two sources upstream declares authoritative — `run
 - [x] The model exposes `runtime` and raises `runtime-state-divergence` when the graph marks a stage completed that state.md does not.
 - [x] Stages shows depth, test strategy, guard policy, sensors, plan approval and collaborators when the record carries them; Sources adds an Execution record row.
 - [x] Tests: runtime-graph parser, settings parsing, and an end-to-end divergence case over a copied fixture.
-- [ ] Timing still derives spans from the audit; runtime spans are shown, not substituted. Decide in Phase 3 whether to swap the source.
+- [x] Decision: keep the audit as the timing source (it survives a fresh clone) and show runtime-graph spans beside it; a completed-but-not-done divergence raises a warning.
 

@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import * as path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { assemble } from "../../../../server/model/assemble";
-import { App } from "../src/index.js";
+import { createElement } from "react";
+import LedgerPage, { App } from "../src/index.js";
 
 // The host shell is not on this machine, so the page logic is proven where it can
 // be: the same component tree, server-rendered against the reference fixture. This
@@ -47,6 +48,19 @@ describe("AI-DLC Ledger pages", () => {
     expect(html).toContain("Freshness of each input");
     expect(html).toContain("runtime-graph");
     expect(html).toContain("Read-only");
+  });
+
+  test("an open gate gets the answer panel with a disabled send until a session maps", () => {
+    const gated = { ...model, gates: { ...model.gates, awaitingStage: "code-generation" } };
+    const html = renderToStaticMarkup(App({ model: gated, tab: "decisions" }));
+    expect(html).toContain("Answer the open gate");
+    expect(html).toContain("Looking for this workspace");
+    expect(html).toContain("disabled");
+  });
+
+  test("the default export is the page component the host renders", () => {
+    const html = renderToStaticMarkup(createElement(LedgerPage));
+    expect(html).toContain("Reading the run");
   });
 
   test("a model without optional planes still renders every tab", () => {

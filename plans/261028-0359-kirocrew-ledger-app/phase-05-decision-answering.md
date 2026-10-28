@@ -1,6 +1,6 @@
 ---
 title: "Phase 5: Decision answering, exactly once"
-status: todo
+status: completed
 ---
 
 # Phase 5: Decision answering, exactly once
@@ -49,7 +49,8 @@ Let a reader answer a gate or a question from the app, with the exact text shown
 
 - [x] `apps/kirocrew/backend/src/decisions.ts`: the single producer of an answer's exact text (approve / request changes / verbatim answer), validation codes, and the send lifecycle where a repeated `sendId` never sends twice and "resolved" requires engine evidence, never an HTTP 200.
 - [x] Tests cover composition, empty feedback/answer refusals, duplicate sends, and that pending/uncertain/refused records cannot be marked resolved.
-- [ ] Host adapter: `POST /api/chat` with `slotKey` + `meta.sendId`, session mapping from the audit, and post-send verification against audit+state. Needs a running Kiro Crew gateway.
+- [x] Host path: the page maps its workspace to a chat slot by `project` (an app token is refused owner routes by design) and posts the previewed text with `sendId` to `POST /api/chat`. Verified with a throwaway slot (deleted afterwards); no real gate answer was sent, to avoid altering a live run.
+- [ ] Post-send verification against audit+state (delivery is reported, resolution is never claimed).
 
 ## Risk Assessment
 

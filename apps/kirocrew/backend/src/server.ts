@@ -16,10 +16,83 @@ import { assemble } from "../../../../server/model/assemble";
 import { artifactBase } from "../../../../server/scan/outcomes";
 import { resolveState } from "../../../../server/scan/resolve";
 import { readArtifactSource } from "../../../../server/scan/view-file";
+import { listSlots, sendChat, slotForWorkspace } from "./chat";
+import {
+  type DecisionDraft,
+  type SendRecord,
+  beginSend,
+  composeAnswer,
+  markDelivered,
+  markRefused,
+  markUncertain,
+  validateDraft,
+} from "./decisions";
 
 const BASE = "/api/apps/aidlc-ledger";
 const PORT = Number(process.env.PORT ?? 0);
-const ROOT = process.env.AIDLC_LEDGER_ROOT?.trim() || undefined;
+// The installed app root: <app>/backend/dist/server.js → ../..
+// `import.meta.dir` is Bun-only; Node needs the file URL form.
+const HERE = path.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+const APP_ROOT = path.join(HERE, "..", "..");
+const WORKSPACE_FILE = path.join(APP_ROOT, "data", "workspace.json");
+
+function storedRoot(): string | undefined {
+  try {
+    const doc: unknown = JSON.parse(fs.readFileSync(WORKSPACE_FILE, "utf-8"));
+    if (typeof doc !== "object" || doc === null || !("root" in doc)) return undefined;
+    return typeof doc.root === "string" && doc.root.trim().length > 0 ? doc.root.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Send records for this process, keyed by sendId. */
+const sends = new Map<string, SendRecord>();
+
+function draftOf(value: unknown): DecisionDraft | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const pick = (name: string): string | undefined => {
+    if (!(name in value)) return undefined;
+    const field = Reflect.get(value, name);
+    return typeof field === "string" ? field : undefined;
+  };
+  const stage = pick("stage");
+  const choice = pick("choice");
+  if (!stage || (choice !== "approve" && choice !== "request-changes" && choice !== "answer")) {
+    return undefined;
+  }
+  const unit = pick("unit");
+  const feedback = pick("feedback");
+  const answer = pick("answer");
+  return {
+    stage,
+    choice,
+    ...(unit ? { unit } : {}),
+    ...(feedback ? { feedback } : {}),
+    ...(answer ? { answer } : {}),
+  };
+}
+
+async function readBody(req: import("node:http").IncomingMessage): Promise<unknown> {
+  return new Promise((resolve) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 256 * 1024) req.destroy();
+    });
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(body));
+      } catch {
+        resolve(undefined);
+      }
+    });
+    req.on("error", () => resolve(undefined));
+  });
+}
+
+/** Selected workspace: the env override wins, then the app's own data file. */
+let ROOT = process.env.AIDLC_LEDGER_ROOT?.trim() || storedRoot();
 
 /** A refusal the client can act on, mapped to its HTTP status. */
 class Refusal extends Error {
@@ -69,14 +142,132 @@ function view(rel: string | null): unknown {
   return readArtifactSource(artifactBase(ROOT, recordDir, rel), rel);
 }
 
-const server = createServer((req, res) => {
+const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   if (url.pathname === "/health") {
     json(res, 200, { ok: true });
     return;
   }
-  if (req.method !== "GET" && req.method !== "HEAD") {
+  const writeRoute =
+    req.method === "POST" &&
+    (url.pathname === `${BASE}/workspace` ||
+      url.pathname === `${BASE}/decisions/preview` ||
+      url.pathname === `${BASE}/decisions/send`);
+  if (!writeRoute && req.method !== "GET" && req.method !== "HEAD") {
     json(res, 405, { error: { code: "read-only" } });
+    return;
+  }
+  if (url.pathname === `${BASE}/mapping`) {
+    const slots = await listSlots();
+    if (!slots) {
+      json(res, 503, { error: { code: "no-gateway" } });
+      return;
+    }
+    const slot = ROOT ? slotForWorkspace(slots, ROOT) : undefined;
+    json(res, 200, {
+      slot: slot ? { key: slot.key, title: slot.title ?? null } : null,
+      count: slots.length,
+    });
+    return;
+  }
+  if (url.pathname === `${BASE}/decisions` && req.method === "GET") {
+    json(res, 200, { records: [...sends.values()] });
+    return;
+  }
+  if (url.pathname === `${BASE}/decisions/preview` && req.method === "POST") {
+    const body = await readBody(req);
+    const draft =
+      typeof body === "object" && body !== null && "draft" in body
+        ? draftOf(body.draft)
+        : draftOf(body);
+    if (!draft) {
+      json(res, 400, { error: { code: "invalid-decision" } });
+      return;
+    }
+    json(res, 200, { text: composeAnswer(draft), problems: validateDraft(draft) });
+    return;
+  }
+  if (url.pathname === `${BASE}/decisions/send` && req.method === "POST") {
+    const body = await readBody(req);
+    if (typeof body !== "object" || body === null || !("draft" in body)) {
+      json(res, 400, { error: { code: "invalid-decision" } });
+      return;
+    }
+    const draft = draftOf(body.draft);
+    if (!draft) {
+      json(res, 400, { error: { code: "invalid-decision" } });
+      return;
+    }
+    const problems = validateDraft(draft);
+    if (problems.length > 0) {
+      json(res, 400, { error: { code: "invalid-decision", problems } });
+      return;
+    }
+    const text = composeAnswer(draft);
+    const sendId =
+      "sendId" in body && typeof body.sendId === "string" && body.sendId.length > 0
+        ? body.sendId
+        : crypto.randomUUID();
+    const requestedSlot =
+      "slot" in body && typeof body.slot === "string" && body.slot.length > 0
+        ? body.slot
+        : undefined;
+    const started = beginSend(sends.get(sendId), { sendId, slotKey: "", text });
+    if (!started.send) {
+      json(res, 200, { record: started.record, replayed: true });
+      return;
+    }
+    let slot = requestedSlot;
+    if (!slot && ROOT) {
+      const slots = await listSlots();
+      slot = slots ? slotForWorkspace(slots, ROOT)?.key : undefined;
+    }
+    if (!slot) {
+      const refused = markRefused(started.record, "no-session");
+      sends.set(sendId, refused);
+      json(res, 409, { error: { code: "no-session" }, record: refused });
+      return;
+    }
+    const result = await sendChat({ message: text, slot, sendId });
+    const keyed = { ...started.record, slotKey: slot };
+    const record = result.ok
+      ? markDelivered(keyed)
+      : result.status !== undefined && result.status < 500
+        ? markRefused(keyed, `gateway-${result.status}`)
+        : markUncertain(keyed, result.detail ?? "unconfirmed");
+    sends.set(sendId, record);
+    json(res, result.ok ? 200 : 502, { record, text });
+    return;
+  }
+  if (url.pathname === `${BASE}/workspace`) {
+    if (req.method === "POST") {
+      let body = "";
+      req.on("data", (chunk) => {
+        body += chunk;
+        if (body.length > 64 * 1024) req.destroy();
+      });
+      req.on("end", () => {
+        try {
+          const doc: unknown = JSON.parse(body);
+          const root =
+            typeof doc === "object" && doc !== null && "root" in doc && typeof doc.root === "string"
+              ? doc.root.trim()
+              : "";
+          if (!root || !isWorkspace(root)) {
+            json(res, 400, { error: { code: "not-a-workspace" } });
+            return;
+          }
+          fs.mkdirSync(path.dirname(WORKSPACE_FILE), { recursive: true });
+          fs.writeFileSync(WORKSPACE_FILE, `${JSON.stringify({ root }, null, 2)}\n`);
+          ROOT = root;
+          json(res, 200, { root });
+        } catch {
+          json(res, 400, { error: { code: "bad-request" } });
+        }
+      });
+      return;
+    }
+    json(res, 200, { root: ROOT ?? null });
     return;
   }
   if (url.pathname === `${BASE}/meta`) {

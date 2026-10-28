@@ -7,31 +7,44 @@
 //
 // Read-only: the only network call is the app's own model route.
 
-import {
-  CircleAlertIcon,
-  CircleCheckIcon,
-  CircleXIcon,
-  ClockIcon,
-  FileTextIcon,
-  GaugeIcon,
-  ListTreeIcon,
-} from "lucide-react";
+// The host's import map re-exports a fixed set of names plus a default proxy for
+// the rest, so read icons through the default export and fall back to a name the
+// host definitely provides.
+import lucideDefault, * as lucideNamed from "lucide-react";
+
+function icon(wanted, fallback) {
+  return (
+    lucideDefault?.[wanted] ??
+    lucideNamed[wanted] ??
+    lucideNamed[fallback] ??
+    lucideDefault?.[fallback] ??
+    lucideNamed.AlertTriangle
+  );
+}
+
+const CircleCheck = icon("CircleCheck", "Check");
+const CircleAlert = icon("CircleAlert", "AlertTriangle");
+const CircleX = icon("CircleX", "X");
+const Clock = icon("Clock", "Clock");
 import { createElement as h, useEffect, useState } from "react";
-import { createRoot } from "react-dom/client";
 
-const BASE = "/api/apps/aidlc-ledger";
+// App backends are reached through the gateway's app proxy, not the API path:
+// `/apps/<name>/api/<backend path>` (verified against a running gateway).
+const BASE = "/apps/aidlc-ledger/api/apps/aidlc-ledger";
 
+// Host theme variables (measured on the running gateway): --bg, --card,
+// --border, --muted, --text, --accent. Everything else is this app's own palette,
+// so a missing host variable falls back to the product colour rather than black.
 const T = {
-  fg: "var(--foreground, #000000)",
-  muted: "var(--muted-foreground, #4b5563)",
+  fg: "var(--text, #000000)",
+  muted: "var(--muted, #4b5563)",
   border: "var(--border, #e5e7eb)",
   card: "var(--card, #ffffff)",
   primary: "var(--primary, #ffc708)",
   primaryFg: "#000000",
   success: "var(--success, #16a34a)",
   warning: "var(--warning, #f59e0b)",
-  danger: "var(--destructive, #dc2626)",
-  blue: "var(--brand-blue, #0070c9)",
+  danger: "var(--destructive, #ef4444)",
 };
 
 const TABS = [
@@ -72,12 +85,12 @@ function Muted({ children }) {
 }
 
 const STATUS = {
-  done: [CircleCheckIcon, "done", T.success],
-  active: [ClockIcon, "active", T.warning],
-  awaiting: [CircleAlertIcon, "awaiting approval", T.warning],
-  revising: [CircleAlertIcon, "revising", T.warning],
-  skipped: [CircleXIcon, "skipped", T.muted],
-  pending: [CircleAlertIcon, "pending", T.muted],
+  done: [CircleCheck, "done", T.success],
+  active: [Clock, "active", T.warning],
+  awaiting: [CircleAlert, "awaiting approval", T.warning],
+  revising: [CircleAlert, "revising", T.warning],
+  skipped: [CircleX, "skipped", T.muted],
+  pending: [CircleAlert, "pending", T.muted],
 };
 
 function Status({ status }) {
@@ -242,7 +255,7 @@ function Stages({ m }) {
                   runtimeStage?.elapsedSec !== undefined
                     ? h(
                         "span",
-                        { style: { color: T.blue, fontSize: 12 } },
+                        { style: { color: T.fg, fontSize: 12 } },
                         `engine ${seconds(runtimeStage.elapsedSec)}`,
                       )
                     : null,
@@ -295,6 +308,202 @@ function Timeline({ m }) {
   );
 }
 
+function AnswerPanel({ m }) {
+  const [choice, setChoice] = useState("approve");
+  const [feedback, setFeedback] = useState("");
+  const [preview, setPreview] = useState("");
+  const [problems, setProblems] = useState([]);
+  const [mapping, setMapping] = useState({ status: "loading" });
+  const [result, setResult] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const stage = m.gates.awaitingStage;
+
+  // Mapping runs in the page, as the owner: only the owner may list sessions, and
+  // a third-party app token is refused there by design.
+  useEffect(() => {
+    let live = true;
+    fetch("/api/chat/slots", { cache: "no-store", credentials: "include" })
+      .then(async (res) => {
+        const slots = res.ok ? await res.json() : [];
+        if (!live) return;
+        const root = (m.identity?.root ?? "").replace(/\/+$/, "");
+        const match = Array.isArray(slots)
+          ? (slots.find((slot) => (slot.project ?? "").replace(/\/+$/, "") === root) ??
+            slots.find((slot) => (slot.project ?? "").startsWith(`${root}/`)) ??
+            null)
+          : null;
+        setMapping({ status: "ready", slot: match });
+      })
+      .catch(() => live && setMapping({ status: "unavailable" }));
+    return () => {
+      live = false;
+    };
+  }, [m.identity?.root]);
+
+  useEffect(() => {
+    if (!stage) return;
+    const timer = setTimeout(() => {
+      const draft = {
+        stage,
+        choice,
+        ...(choice === "request-changes" ? { feedback } : {}),
+      };
+      fetch(`${BASE}/decisions/preview`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ draft }),
+      })
+        .then(async (res) => {
+          const body = await res.json().catch(() => ({}));
+          setPreview(body.text ?? "");
+          setProblems(body.problems ?? []);
+        })
+        .catch(() => setPreview(""));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [stage, choice, feedback]);
+
+  if (!stage) return null;
+  const slot = mapping.slot;
+  const blocked = mapping.status === "loading" ? "Looking for this workspace's session…" : null;
+  const canSend = Boolean(slot) && preview.length > 0 && problems.length === 0 && !busy;
+
+  function send() {
+    setBusy(true);
+    setResult(null);
+    fetch(`${BASE}/decisions/send`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sendId: crypto.randomUUID(),
+        draft: {
+          stage,
+          choice,
+          ...(choice === "request-changes" ? { feedback } : {}),
+        },
+      }),
+    })
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        setResult({
+          status: res.ok ? "delivered" : (body.error?.code ?? "refused"),
+          record: body.record,
+        });
+      })
+      .catch(() => setResult({ status: "unreachable" }))
+      .finally(() => setBusy(false));
+  }
+
+  return h(
+    Card,
+    { title: `Answer the open gate · ${stage}` },
+    h(
+      "div",
+      { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+      ["approve", "request-changes"].map((value) =>
+        h(
+          "button",
+          {
+            key: value,
+            type: "button",
+            onClick: () => setChoice(value),
+            "aria-pressed": choice === value,
+            style: {
+              border: `1px solid ${choice === value ? T.primary : T.border}`,
+              background: choice === value ? T.primary : "transparent",
+              color: choice === value ? T.primaryFg : T.fg,
+              borderRadius: 999,
+              padding: "4px 12px",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            },
+          },
+          value === "approve" ? "Approve" : "Request changes",
+        ),
+      ),
+    ),
+    choice === "request-changes"
+      ? h("textarea", {
+          value: feedback,
+          onChange: (event) => setFeedback(event.target.value),
+          placeholder: "What should change? Your words are sent as written.",
+          rows: 3,
+          style: {
+            width: "100%",
+            boxSizing: "border-box",
+            padding: 8,
+            borderRadius: 4,
+            border: `1px solid ${T.border}`,
+            background: T.card,
+            color: T.fg,
+            font: "inherit",
+          },
+        })
+      : null,
+    h(Muted, null, "This exact text will be sent:"),
+    h(
+      "pre",
+      {
+        style: {
+          margin: 0,
+          padding: 8,
+          borderRadius: 4,
+          border: `1px solid ${T.border}`,
+          background: T.card,
+          color: T.fg,
+          fontSize: 13,
+          whiteSpace: "pre-wrap",
+        },
+      },
+      preview || "…",
+    ),
+    problems.length > 0
+      ? h("p", { style: { margin: 0, color: T.warning, fontSize: 13 } }, problems.join(", "))
+      : null,
+    h(
+      "div",
+      { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } },
+      h(
+        "button",
+        {
+          type: "button",
+          onClick: send,
+          disabled: !canSend,
+          style: {
+            padding: "6px 14px",
+            borderRadius: 4,
+            border: "none",
+            background: T.primary,
+            color: T.primaryFg,
+            fontWeight: 600,
+            cursor: canSend ? "pointer" : "not-allowed",
+            opacity: canSend ? 1 : 0.6,
+          },
+        },
+        busy ? "Sending…" : "Send to the intent session",
+      ),
+      h(
+        Muted,
+        null,
+        blocked ??
+          (slot
+            ? `Session: ${slot.title ?? slot.key}`
+            : "No Kiro Crew session is bound to this workspace, so nothing is sent."),
+      ),
+    ),
+    result
+      ? h(
+          Muted,
+          null,
+          result.status === "delivered"
+            ? "Delivered. AI-DLC records it as a human turn; this page does not mark it resolved."
+            : `Not delivered: ${result.status}`,
+        )
+      : null,
+  );
+}
+
 function Decisions({ m }) {
   const items = m.deferrals?.items ?? [];
   const questions = m.questions ?? {};
@@ -309,6 +518,7 @@ function Decisions({ m }) {
       h(Figure, { label: "unanswered", value: questions.totalUnanswered ?? 0 }),
       h(Figure, { label: "questions", value: questions.totalQuestions ?? 0 }),
     ),
+    h(AnswerPanel, { m }),
     h(
       Card,
       { title: "Deferred items" },
@@ -426,7 +636,7 @@ function Sources({ m }) {
                       border: "none",
                       background: "none",
                       padding: 0,
-                      color: T.blue,
+                      color: T.fg,
                       font: "inherit",
                       textDecoration: "underline",
                       textUnderlineOffset: 4,
@@ -497,7 +707,19 @@ export function App({ model, tab = "overview", onTab = () => {} }) {
   const Page = BODY[tab] ?? Overview;
   return h(
     "div",
-    { style: { display: "grid", gap: 16, color: T.fg, fontFamily: "inherit" } },
+    {
+      // Stable hook for store screenshots and for tests that need the app surface.
+      "data-ledger-root": "",
+      style: {
+        display: "grid",
+        gap: 16,
+        color: T.fg,
+        fontFamily: "inherit",
+        // The host's floating command bar sits over the page's first rows.
+        padding: "52px 8px 16px",
+        maxWidth: 1100,
+      },
+    },
     h(
       "nav",
       { style: { display: "flex", flexWrap: "wrap", gap: 6 }, "aria-label": "Ledger sections" },
@@ -529,42 +751,129 @@ export function App({ model, tab = "overview", onTab = () => {} }) {
   );
 }
 
-export function mount(element) {
-  const root = createRoot(element);
-  function Shell() {
-    const [state, setState] = useState({ status: "loading" });
-    const [tab, setTab] = useState("overview");
-    useEffect(() => {
-      let live = true;
-      fetch(`${BASE}/model`, { cache: "no-store", headers: { accept: "application/json" } })
-        .then(async (res) => {
-          const body = await res.json();
-          if (!live) return;
-          setState(
-            res.ok
-              ? { status: "ready", model: body }
-              : { status: "refused", code: body?.error?.code },
-          );
-        })
-        .catch(() => live && setState({ status: "unreachable" }));
-      return () => {
-        live = false;
-      };
-    }, []);
-    if (state.status === "loading") return h(Muted, null, "Reading the run…");
-    if (state.status === "unreachable") return h(Muted, null, "The Ledger backend did not answer.");
-    if (state.status === "refused")
-      return h(
-        Muted,
-        null,
-        state.code === "no-workspace"
-          ? "No workspace is selected yet. Pick an AI-DLC v2 workspace to read."
-          : state.code === "not-a-workspace"
+/** First-run path: name the workspace the app should read (read-only afterwards). */
+function WorkspacePicker() {
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  function save(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    fetch(`${BASE}/workspace`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ root: value }),
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          window.location.reload();
+          return;
+        }
+        const body = await res.json().catch(() => null);
+        setError(body?.error?.code ?? "refused");
+      })
+      .catch(() => setError("unreachable"))
+      .finally(() => setBusy(false));
+  }
+  return h(
+    "div",
+    { style: { display: "grid", gap: 12, padding: "52px 8px 16px", maxWidth: 720 } },
+    h(
+      "h1",
+      { style: { margin: 0, fontSize: 22, fontWeight: 600, color: T.fg } },
+      "Choose an AI-DLC v2 workspace",
+    ),
+    h(
+      Muted,
+      null,
+      "The app reads this folder and never writes to it. The choice is kept for this app only.",
+    ),
+    h(
+      "form",
+      { onSubmit: save, style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+      h("input", {
+        value,
+        onChange: (event) => setValue(event.target.value),
+        placeholder: "/home/you/work/project",
+        "aria-label": "Workspace path",
+        style: {
+          flex: "1 1 320px",
+          minWidth: 240,
+          padding: "8px 10px",
+          borderRadius: 4,
+          border: `1px solid ${T.border}`,
+          background: T.card,
+          color: T.fg,
+          font: "inherit",
+        },
+      }),
+      h(
+        "button",
+        {
+          type: "submit",
+          disabled: busy,
+          style: {
+            padding: "8px 14px",
+            borderRadius: 4,
+            border: "none",
+            background: T.primary,
+            color: T.primaryFg,
+            fontWeight: 600,
+            cursor: busy ? "wait" : "pointer",
+          },
+        },
+        busy ? "Checking…" : "Read this workspace",
+      ),
+    ),
+    error
+      ? h(
+          "p",
+          { style: { margin: 0, color: T.danger, fontSize: 13 } },
+          error === "not-a-workspace"
+            ? "That folder has no aidlc/ tree."
+            : error === "unreachable"
+              ? "The Ledger backend did not answer."
+              : "The workspace could not be set.",
+        )
+      : null,
+  );
+}
+
+// The host renders the default export as a page component (see the App Kit
+// example): no manual root, no manual mount. Hooks live here, while `App` stays a
+// pure tree so it can be server-rendered in tests.
+export default function LedgerPage() {
+  const [state, setState] = useState({ status: "loading" });
+  const [tab, setTab] = useState("overview");
+  useEffect(() => {
+    let live = true;
+    fetch(`${BASE}/model`, { cache: "no-store", headers: { accept: "application/json" } })
+      .then(async (res) => {
+        const body = await res.json();
+        if (!live) return;
+        setState(
+          res.ok
+            ? { status: "ready", model: body }
+            : { status: "refused", code: body?.error?.code },
+        );
+      })
+      .catch(() => live && setState({ status: "unreachable" }));
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (state.status === "loading") return h(Muted, null, "Reading the run…");
+  if (state.status === "unreachable") return h(Muted, null, "The Ledger backend did not answer.");
+  if (state.status === "refused")
+    return state.code === "no-workspace"
+      ? h(WorkspacePicker)
+      : h(
+          Muted,
+          null,
+          state.code === "not-a-workspace"
             ? "That path is not an AI-DLC v2 workspace."
             : "The run could not be read.",
-      );
-    return h(App, { model: state.model, tab, onTab: setTab });
-  }
-  root.render(h(Shell));
-  return () => root.unmount();
+        );
+  return h(App, { model: state.model, tab, onTab: setTab });
 }

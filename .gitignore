@@ -34,3 +34,6 @@ aidlc/spaces/*/intents/*/runtime-graph.json
 aidlc/spaces/*/intents/*/.aidlc-*
 aidlc/diagnostics/
 # END AI-DLC:gitignore
+
+# Kiro Crew app runtime (workspace selection, logs)
+/apps/kirocrew/data/

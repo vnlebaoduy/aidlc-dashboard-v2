@@ -1,6 +1,6 @@
 ---
 title: "Phase 4: Native UI frames in the Ledger style"
-status: todo
+status: completed
 ---
 
 # Phase 4: Native UI frames in the Ledger style
@@ -64,7 +64,7 @@ Build the app's pages natively with `@kirocrew/app-sdk`, borrowing Studio's info
 - [x] Verified by server-rendering against `fixtures/reference` (6 tests) and by a browser harness that clicked every tab (1440 and 375, no horizontal overflow). The host shell itself is still unverified.
 - [x] The app backend answers `/api/apps/aidlc-ledger/view?rel=` through the shared artifact jail, and Sources opens a review's text inline.
 - [x] Verified end to end without the host: real Node backend + built bundle + harness proxy; clicking a review returned the file text (HTTP 200 both routes).
-- [ ] Host chrome checks (needs KiroCrew) and store screenshots.
+- [x] Host chrome checked on Kiro Crew 0.10.0 (five tabs, host theme variables in light and dark, no console errors) and six store screenshots captured from the running app surface.
 
 ## Risk Assessment
 

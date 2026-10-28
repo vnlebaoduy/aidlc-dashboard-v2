@@ -1,6 +1,6 @@
 ---
 title: "Phase 1: App skeleton and Node backend"
-status: todo
+status: completed
 ---
 
 # Phase 1: App skeleton and Node backend
@@ -53,7 +53,7 @@ Stand up `AI-DLC Ledger` as a Kiro Crew app inside this monorepo, with the share
 - [x] Shared `assemble()` used unchanged; `usage` dropped from the payload; no `bun:sqlite` in the bundle (verified by grep and CI gate).
 - [x] `apps/kirocrew/ui/src/index.js` bundled to `ui/dist/index.mjs` with `react`/`react-dom/client` external; `mount()` renders phase, progress, blockers, warnings.
 - [x] `bun run verify` includes the app typecheck, lint and build; CI adds a plain-Node smoke run.
-- [ ] Install in Kiro Crew, sidebar page renders fixture data, no own port (needs KiroCrew on `:5476`).
+- [x] Installed in Kiro Crew 0.10.0: `kirocrew app install/enable`, backend healthy, page renders in the host shell, light and dark readable, `/apps/aidlc-ledger/api/*` answers 200, no own exposed port.
 
 
 ## Risk Assessment
