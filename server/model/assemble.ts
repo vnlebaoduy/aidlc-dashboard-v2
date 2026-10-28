@@ -35,8 +35,10 @@ import { readDiaries } from "../scan/memory-diary";
 import { readOutcomes } from "../scan/outcomes";
 import { type StageStatus, parseState } from "../scan/parser";
 import { readPlan } from "../scan/plan";
+import { readPluginInventory } from "../scan/plugins";
 import { readQuestions } from "../scan/questions";
 import { resolveState } from "../scan/resolve";
+import { readReviews } from "../scan/reviews";
 import { buildRework } from "../scan/rework";
 import { readRuntimeGraph } from "../scan/runtime-graph";
 import { readSensorReport } from "../scan/sensors";
@@ -604,6 +606,8 @@ export function assemble(
   const phaseChecks = readPhaseChecks(recordDir);
   const knowledge = readKnowledge(path.join(root, "aidlc", "spaces", space));
   const plan = readPlan(recordDir);
+  const reviews = readReviews(recordDir);
+  const plugins = catalog?.harnessDir ? readPluginInventory(root, catalog.harnessDir) : undefined;
 
   // Usage slot. Which provider runs is resolved here, then that provider's
   // assembly is isolated: both read outside the workspace (SQLite handle / home
@@ -687,6 +691,8 @@ export function assemble(
     ...(phaseChecks ? { phaseChecks } : {}),
     ...(knowledge ? { knowledge } : {}),
     ...(plan ? { plan } : {}),
+    ...(reviews ? { reviews } : {}),
+    ...(plugins ? { plugins } : {}),
     blockers: buildBlockers(questions, state.currentStage, now),
     gates: buildGates(ledger, state.revisionCount, timing.awaitingStage),
     rework: buildRework(ledger),

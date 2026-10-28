@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n";
 import type { RunIdentity } from "@server/model/types";
 import type { IntentRow } from "@server/scan/intents";
 import type { PlannedStage } from "@server/scan/plan";
+import type { PluginInventory } from "@server/scan/plugins";
 import type { RuntimeGraph } from "@server/scan/runtime-graph";
 import { FolderTreeIcon } from "lucide-react";
 
@@ -15,12 +16,14 @@ export function IdentityCard({
   plan,
   spaces,
   intents,
+  plugins,
 }: {
   id: RunIdentity;
   runtime?: RuntimeGraph;
   plan?: PlannedStage[];
   spaces?: string[];
   intents?: IntentRow[];
+  plugins?: PluginInventory;
 }) {
   const { s, c } = useI18n();
   const t = c.sourcesPage;
@@ -40,6 +43,9 @@ export function IdentityCard({
     ...(plan ? [[t.plan, t.planSummary(execute, skip), true] as [string, string, boolean]] : []),
     ...(spaces ? [[t.spaces, spaces.join(" · "), true] as [string, string, boolean]] : []),
     ...(intents ? [[t.registry, String(intents.length), true] as [string, string, boolean]] : []),
+    ...(plugins
+      ? [[t.plugins, plugins.enabled.join(", ") || "—", true] as [string, string, boolean]]
+      : []),
   ];
   return (
     <Section title={t.identity} icon={<FolderTreeIcon />}>

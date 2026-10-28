@@ -43,6 +43,19 @@ function Page() {
           </Link>
         </WarnNote>
       ) : null}
+      {m.signals?.guardRefusals.some((r) => r.pendingAsk) ? (
+        <WarnNote>
+          <ul className="space-y-1">
+            {m.signals.guardRefusals
+              .filter((r) => r.pendingAsk)
+              .map((r) => (
+                <li key={`${r.stage}:${r.unit ?? ""}`}>
+                  {c.overviewPage.guardRefusal(r.stage, r.count)}
+                </li>
+              ))}
+          </ul>
+        </WarnNote>
+      ) : null}
       <NeedsYou m={m} />
       <OutcomesCard m={m} />
       <KpiStrip m={m} />

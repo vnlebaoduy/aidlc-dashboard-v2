@@ -64,5 +64,8 @@ Cover the upstream planes the dashboard currently ignores: `.aidlc-engine/` deci
 - [x] `server/scan/knowledge.ts`: counts `knowledge/documents`, parses `documentkb/index.json` (extraction states, tombstones, linked rows), lists `codekb/<repo>` and the `memory/` rule files; broken catalog still reports what it can see.
 - [x] `server/scan/plan.ts`: reads `.aidlc-engine/plan.json` (`{slug, phase, action}`), dropping shapeless rows.
 - [x] Sources renders the new planes: Knowledge inputs (documents, index states, tombstones, codekb, rule files), Phase checks with viewer links, and identity rows for the resolved plan, spaces and the intent registry.
-- [ ] Plugins, reviews, and the "needs you" treatment for guard refusals / stalled turn (Phase 4 decision queue).
+- [x] `server/scan/reviews.ts`: reads `<stage>/reviews/review-NN.md` (verdict, reviewer, iteration, new-findings count), keeps the Unit for Construction, returns viewer paths.
+- [x] `server/scan/plugins.ts`: reads the harness inventory (`tools/data/harness.json` → `plugins`) and shows the enabled list on Sources.
+- [x] Sources renders Reviewer passes; Overview warns when a guard holds a stage with its recovery question left.
+- [ ] Plugin-owned stages marked `enabled: false` in the compiled graph are still counted as ordinary stages; add the flag to the catalogue reader and a coverage warning.
 

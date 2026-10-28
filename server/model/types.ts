@@ -27,7 +27,9 @@ import type { DiaryReport } from "../scan/memory-diary";
 import type { OutcomesFile } from "../scan/outcomes";
 import type { AidlcState } from "../scan/parser";
 import type { PlannedStage } from "../scan/plan";
+import type { PluginInventory } from "../scan/plugins";
 import type { AskKind, QuestionsReport } from "../scan/questions";
+import type { ReviewRecord } from "../scan/reviews";
 import type { ReworkReport } from "../scan/rework";
 import type { RuntimeGraph } from "../scan/runtime-graph";
 import type { SensorReport } from "../scan/sensors";
@@ -283,6 +285,10 @@ export interface DashboardModel {
   knowledge?: KnowledgeSummary;
   /** The engine's resolved plan for this intent, when the derived file is present. */
   plan?: PlannedStage[];
+  /** Reviewer passes found under `<stage>/reviews/`, oldest first per stage. */
+  reviews?: ReviewRecord[];
+  /** Enabled plugin list from the harness inventory, when it ships one. */
+  plugins?: PluginInventory;
   /** Audit event counts by type, for the stream filter. */
   eventCounts: [string, number][];
   /** Newest audit events, for the stream panel (bounded — see assemble.ts). */

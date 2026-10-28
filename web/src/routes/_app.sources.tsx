@@ -110,12 +110,38 @@ function Page() {
         )}
       </Section>
 
+      {m.reviews ? (
+        <Section title={c.sourcesPage.reviews} icon={<ClipboardCheckIcon />}>
+          <ul className="space-y-2 text-sm">
+            {m.reviews.map((review) => (
+              <li key={review.rel} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="font-medium">
+                  {review.unit ? `${review.unit} · ` : ""}
+                  {review.stage}
+                </span>
+                <span className="text-muted-foreground tabular">#{review.number}</span>
+                {review.verdict ? <span className="font-medium">{review.verdict}</span> : null}
+                {review.findings !== undefined && review.findings > 0 ? (
+                  <span className="text-muted-foreground">
+                    {c.sourcesPage.reviewFindings(review.findings)}
+                  </span>
+                ) : null}
+                <ViewLink rel={review.rel} title={review.rel} className="inline">
+                  {review.rel.split("/").pop() ?? review.rel}
+                </ViewLink>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
+
       <IdentityCard
         id={m.identity}
         runtime={m.runtime}
         plan={m.plan}
         spaces={m.spaces}
         intents={m.intents}
+        plugins={m.plugins}
       />
     </div>
   );

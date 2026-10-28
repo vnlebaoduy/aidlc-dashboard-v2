@@ -107,6 +107,9 @@ export interface ChromeStrings {
     phaseChecks: string;
     phaseCheckEmpty: string;
     plan: string;
+    plugins: string;
+    reviews: string;
+    reviewFindings: (n: number) => string;
     planSummary: (execute: number, skip: number) => string;
     spaces: string;
     registry: string;
@@ -152,6 +155,7 @@ export interface ChromeStrings {
     /** `wait` already formatted. */
     waiting: (wait: string) => string;
     readWarnings: (n: number) => string;
+    guardRefusal: (stage: string, count: number) => string;
     outcomesTitle: string;
     outcomesLead: string;
     outcomesOpen: string;
@@ -290,6 +294,9 @@ const EN: ChromeStrings = {
     phaseChecks: "Phase checks",
     phaseCheckEmpty: "No phase has closed yet.",
     plan: "resolved plan",
+    plugins: "plugins",
+    reviews: "Reviewer passes",
+    reviewFindings: (n) => (n === 1 ? "1 finding" : `${n} findings`),
     planSummary: (execute, skip) => `${execute} execute · ${skip} skip`,
     spaces: "spaces",
     registry: "intent registry",
@@ -342,6 +349,8 @@ const EN: ChromeStrings = {
     waiting: (wait) => `waiting ${wait}`,
     readWarnings: (n) =>
       n === 1 ? "See the warning on Sources" : `See all ${n} warnings on Sources`,
+    guardRefusal: (stage, count) =>
+      `A guard is holding ${stage} (refused ${count}×) and left its recovery question for the next step.`,
     outcomesTitle: "Outcomes pack",
     outcomesLead: "Handover summary of this run: what was built, setup, decisions, next steps.",
     outcomesOpen: "Open OUTCOMES.md",
@@ -480,6 +489,9 @@ const VI: ChromeStrings = {
     phaseChecks: "Kiểm tra phase",
     phaseCheckEmpty: "Chưa phase nào đóng.",
     plan: "plan đã chốt",
+    plugins: "plugin",
+    reviews: "Lượt review",
+    reviewFindings: (n) => `${n} finding`,
     planSummary: (execute, skip) => `${execute} thực thi · ${skip} bỏ`,
     spaces: "space",
     registry: "intent registry",
@@ -531,6 +543,8 @@ const VI: ChromeStrings = {
     needsYou: "Đang chờ bạn",
     waiting: (wait) => `đã chờ ${wait}`,
     readWarnings: (n) => `Xem ${n} cảnh báo ở trang Nguồn dữ liệu`,
+    guardRefusal: (stage, count) =>
+      `Guard đang giữ ${stage} (bị từ chối ${count} lần) và để lại câu hỏi khôi phục cho bước tiếp theo.`,
     outcomesTitle: "Outcomes pack",
     outcomesLead:
       "Tài liệu tổng kết sau khi chạy: đã làm gì, cách cài đặt, quyết định, việc tiếp theo.",
