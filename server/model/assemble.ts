@@ -28,6 +28,7 @@ import { readDeferrals } from "../scan/deferrals";
 import { readEngineSignals } from "../scan/engine-signals";
 import { type HarnessTurns, measureHarnessTurns } from "../scan/harness-usage";
 import { readHealth } from "../scan/hooks-health";
+import { listSpaces, readIntentRegistry } from "../scan/intents";
 import { type StateCompat, readUnitLifecycle, scanConstructionMatrix } from "../scan/matrix";
 import { readDiaries } from "../scan/memory-diary";
 import { readOutcomes } from "../scan/outcomes";
@@ -39,6 +40,7 @@ import { readRuntimeGraph } from "../scan/runtime-graph";
 import { readSensorReport } from "../scan/sensors";
 import { type StageCatalog, harnessDirsWithCatalog, readStageCatalog } from "../scan/stage-catalog";
 import { buildTiming } from "../scan/timing";
+import { readPhaseChecks } from "../scan/verification";
 import { buildProvenance, graphLastEvent } from "./freshness";
 import type {
   Blocker,
@@ -593,6 +595,12 @@ export function assemble(
     ...readRegistry(root, space, record),
   };
 
+  // What a reader needs to choose a piece of work instead of dead-ending on an
+  // ambiguous cursor: the registry rows for this space and the spaces that exist.
+  const intents = readIntentRegistry(path.join(root, "aidlc", "spaces", space));
+  const spaces = listSpaces(root);
+  const phaseChecks = readPhaseChecks(recordDir);
+
   // Usage slot. Which provider runs is resolved here, then that provider's
   // assembly is isolated: both read outside the workspace (SQLite handle / home
   // dir) and a failure there must degrade the one panel, never the dashboard
@@ -670,6 +678,9 @@ export function assemble(
     timing,
     ...(runtime ? { runtime } : {}),
     ...(signals ? { signals } : {}),
+    ...(intents ? { intents } : {}),
+    ...(spaces.length > 1 ? { spaces } : {}),
+    ...(phaseChecks ? { phaseChecks } : {}),
     blockers: buildBlockers(questions, state.currentStage, now),
     gates: buildGates(ledger, state.revisionCount, timing.awaitingStage),
     rework: buildRework(ledger),

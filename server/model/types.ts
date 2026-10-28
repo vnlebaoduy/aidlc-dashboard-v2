@@ -20,6 +20,7 @@ import type { StageArtifact } from "../scan/artifacts";
 import type { DeferralReport } from "../scan/deferrals";
 import type { EngineSignals } from "../scan/engine-signals";
 import type { HealthReport } from "../scan/hooks-health";
+import type { IntentRow } from "../scan/intents";
 import type { ConstructionMatrix } from "../scan/matrix";
 import type { DiaryReport } from "../scan/memory-diary";
 import type { OutcomesFile } from "../scan/outcomes";
@@ -29,6 +30,7 @@ import type { ReworkReport } from "../scan/rework";
 import type { RuntimeGraph } from "../scan/runtime-graph";
 import type { SensorReport } from "../scan/sensors";
 import type { TimingReport } from "../scan/timing";
+import type { PhaseCheck } from "../scan/verification";
 
 /** Where a number came from. */
 export type SourceKind =
@@ -269,6 +271,12 @@ export interface DashboardModel {
    * last). Absent when that gitignored plane is not on this clone.
    */
   signals?: EngineSignals;
+  /** Registry rows for the active space, when `intents.json` is readable. */
+  intents?: IntentRow[];
+  /** Every space directory, present only when the workspace holds more than one. */
+  spaces?: string[];
+  /** Phase boundary checks that have been written, with their mtimes. */
+  phaseChecks?: PhaseCheck[];
   /** Audit event counts by type, for the stream filter. */
   eventCounts: [string, number][];
   /** Newest audit events, for the stream panel (bounded — see assemble.ts). */

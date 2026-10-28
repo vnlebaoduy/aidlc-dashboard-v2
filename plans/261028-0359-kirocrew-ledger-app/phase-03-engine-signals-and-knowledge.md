@@ -59,5 +59,7 @@ Cover the upstream planes the dashboard currently ignores: `.aidlc-engine/` deci
 - [x] The model exposes `signals`; tests cover streak ordering, the left-over ask, malformed records and both turn states.
 - [ ] Surface guard refusals and a stalled turn in the "needs you" queue (Phase 4 UI; needs a product decision on which tier).
 - [ ] Reviews: format is per-stage `<stage dir>/reviews/review-NN.md` plus digest-bound records in `.aidlc-engine/`; read the writer before parsing verdicts.
-- [ ] Plugins, spaces/intents registry, knowledge/documents + documentkb, codekb, phase checks, plan.json.
+- [x] `server/scan/intents.ts`: reads `intents.json` rows (BOM, comments and a trailing comma tolerated) and lists every space; the model carries `intents` and `spaces`.
+- [x] `server/scan/verification.ts`: lists `verification/phase-check-<phase>.md` with a viewer-ready path and mtime; the model carries `phaseChecks`.
+- [ ] Plugins, knowledge/documents + documentkb, codekb, plan.json, and the UI that renders `intents`/`phaseChecks`.
 
