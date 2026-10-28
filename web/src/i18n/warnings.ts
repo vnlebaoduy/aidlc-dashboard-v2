@@ -26,6 +26,8 @@ export function warningTextIn(w: Warning, s: Strings): string {
       return t.catalogNotFound;
     case "audit-empty":
       return t.auditEmpty;
+    case "plugin-stages-disabled":
+      return t.pluginStagesDisabled(w.count);
     case "runtime-state-divergence":
       return t.runtimeStateDivergence(w.stage);
     case "state-version-mismatch":

@@ -60,6 +60,8 @@ const warn: WarnStrings = {
     "artifact-contract judgements and stage attribution fall back to approximations. If the harness tree lives elsewhere, point --harness at it",
 
   auditEmpty: "The audit ledger is empty — the hooks may never have fired",
+  pluginStagesDisabled: (count) =>
+    `${count} stage${count === 1 ? " belongs" : "s belong"} to a disabled plugin and are not part of this run`,
   runtimeStateDivergence: (stage) =>
     `runtime-graph records ${stage} as completed, but state.md does not show it done — one of the two is behind; this page does not pick a winner`,
 

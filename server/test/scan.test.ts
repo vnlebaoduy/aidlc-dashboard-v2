@@ -166,6 +166,7 @@ describe("stage catalogue expectations", () => {
       "frontend-components": ["ui"],
     },
     sensors: [],
+    enabled: true,
   };
 
   test("kind-agnostic artifacts apply to every unit", () => {
@@ -281,11 +282,13 @@ describe("construction matrix", () => {
           optionalProduces: [],
           producesKinds: {},
           sensors: [],
+          enabled: true,
         },
       ],
     ]),
     sourcePath: "/demo/.kiro/tools/data/stage-graph.json",
     harnessDir: ".kiro",
+    disabled: [],
   };
 
   test("three states: complete / partial / absent", () => {

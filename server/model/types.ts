@@ -215,6 +215,8 @@ export type Warning =
    * is behind; the screen names the stage instead of picking a winner.
    */
   | { code: "runtime-state-divergence"; stage: string }
+  /** The compiled graph carries stages a disabled plugin owns; they are not in this run. */
+  | { code: "plugin-stages-disabled"; count: number }
   | { code: "token-usage-failed"; detail: string }
   | { code: "credit-assembly-failed"; detail: string };
 

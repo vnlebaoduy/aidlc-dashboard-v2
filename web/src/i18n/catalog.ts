@@ -155,6 +155,7 @@ export interface WarnStrings {
   readonly auditEmpty: string;
   /** `runtime-graph.json` says the stage completed; state.md does not show it done. */
   runtimeStateDivergence(stage: string): string;
+  pluginStagesDisabled(count: number): string;
   stateVersionMismatch(stateVersion: string, harnessVersion: string, harnessDir: string): string;
   /** `stateVersion` undefined = the field was missing; present = it was unusable. */
   stateVersionUnreadable(stateVersion: string | undefined): string;

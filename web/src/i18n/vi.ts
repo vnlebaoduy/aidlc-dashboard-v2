@@ -56,6 +56,8 @@ const warn: WarnStrings = {
     "phán định artifact-contract và việc gán stage chuyển sang ước lượng gần đúng. Nếu cây harness nằm ở nơi khác, hãy trỏ --harness tới đó",
 
   auditEmpty: "Audit ledger trống — có thể các hook chưa từng chạy",
+  pluginStagesDisabled: (count) =>
+    `${count} stage thuộc plugin đang tắt nên không nằm trong lần chạy này`,
   runtimeStateDivergence: (stage) =>
     `runtime-graph ghi ${stage} đã hoàn thành, nhưng state.md chưa hiện điều đó — một trong hai đang trễ; trang này không tự chọn bên nào`,
 

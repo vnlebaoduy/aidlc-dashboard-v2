@@ -130,6 +130,12 @@ export interface CatalogStage {
   forEach?: string;
   /** Sensor ids declared for the stage. */
   sensors: string[];
+  /**
+   * False when the compiled graph marks a plugin-owned stage `enabled: false` (its
+   * plugin is disabled). The row still exists so a reader can tell "switched off"
+   * from "never there".
+   */
+  enabled: boolean;
 }
 
 export interface StageCatalog {
@@ -140,6 +146,8 @@ export interface StageCatalog {
   sourcePath: string;
   /** The harness dir it was found in, e.g. ".kiro" — shown on the page. */
   harnessDir: string;
+  /** Slugs the graph marks `enabled: false` (a disabled plugin owns them). */
+  disabled: string[];
   /**
    * The state-file schema version THIS harness supports, read from its own
    * `tools/aidlc-lib.ts` (`export const CURRENT_STATE_VERSION = "8"`). Undefined when
@@ -225,6 +233,7 @@ export function readStageCatalog(root: string, harnessDir?: string): StageCatalo
       producesKinds: asKindMap(r.produces_kinds),
       forEach: typeof r.for_each === "string" ? r.for_each : undefined,
       sensors: asStringArray(r.sensors),
+      enabled: r.enabled !== false,
     });
   }
   if (stages.length === 0) return undefined;
@@ -234,6 +243,7 @@ export function readStageCatalog(root: string, harnessDir?: string): StageCatalo
     bySlug: new Map(stages.map((s) => [s.slug, s])),
     sourcePath,
     harnessDir: harness,
+    disabled: stages.filter((s) => !s.enabled).map((s) => s.slug),
     ...(() => {
       const v = readHarnessStateVersion(root, harness);
       return v ? { stateVersion: v } : {};

@@ -325,6 +325,9 @@ export function assemble(
       harnessDir ? { code: "catalog-read-failed", harnessDir } : { code: "catalog-not-found" },
     );
   }
+  if (catalog && catalog.disabled.length > 0) {
+    warnings.push({ code: "plugin-stages-disabled", count: catalog.disabled.length });
+  }
   const isStage = catalog ? (s: string) => catalog?.bySlug.has(s) : undefined;
 
   let stateText: string;
