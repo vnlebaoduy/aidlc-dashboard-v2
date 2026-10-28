@@ -377,25 +377,15 @@ function Timeline({ m }) {
   );
 }
 
-function AnswerPanel({ m }) {
-  const [choice, setChoice] = useState("approve");
-  const [feedback, setFeedback] = useState("");
-  const [preview, setPreview] = useState("");
-  const [problems, setProblems] = useState([]);
+function useChatSlot(m) {
   const [mapping, setMapping] = useState({ status: "loading" });
-  const [result, setResult] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const stage = m.gates.awaitingStage;
-
-  // Mapping runs in the page, as the owner: only the owner may list sessions, and
-  // a third-party app token is refused there by design.
+  const root = (m.identity?.root ?? "").replace(/\/+$/, "");
   useEffect(() => {
     let live = true;
     fetch("/api/chat/slots", { cache: "no-store", credentials: "include" })
       .then(async (res) => {
         const slots = res.ok ? await res.json() : [];
         if (!live) return;
-        const root = (m.identity?.root ?? "").replace(/\/+$/, "");
         const match = Array.isArray(slots)
           ? (slots.find((slot) => (slot.project ?? "").replace(/\/+$/, "") === root) ??
             slots.find((slot) => (slot.project ?? "").startsWith(`${root}/`)) ??
@@ -407,16 +397,40 @@ function AnswerPanel({ m }) {
     return () => {
       live = false;
     };
-  }, [m.identity?.root]);
+  }, [root]);
+  return mapping;
+}
+
+/** Send as the owner from this page; the backend never holds the owner's identity. */
+async function sendAsOwner(slot, message) {
+  const res = await fetch("/api/chat", {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json", accept: "text/event-stream" },
+    body: JSON.stringify({ message, slot: slot.key, meta: { sendId: crypto.randomUUID() } }),
+  });
+  if (res.ok) {
+    await res.body?.cancel().catch(() => undefined);
+    return { ok: true };
+  }
+  const body = await res.json().catch(() => ({}));
+  return { ok: false, status: body?.error?.code ?? body?.code ?? `http-${res.status}` };
+}
+
+function AnswerPanel({ m }) {
+  const [choice, setChoice] = useState("approve");
+  const [feedback, setFeedback] = useState("");
+  const [preview, setPreview] = useState("");
+  const [problems, setProblems] = useState([]);
+  const mapping = useChatSlot(m);
+  const [result, setResult] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const stage = m.gates.awaitingStage;
 
   useEffect(() => {
     if (!stage) return;
     const timer = setTimeout(() => {
-      const draft = {
-        stage,
-        choice,
-        ...(choice === "request-changes" ? { feedback } : {}),
-      };
+      const draft = { stage, choice, ...(choice === "request-changes" ? { feedback } : {}) };
       fetch(`${BASE}/decisions/preview`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -434,33 +448,15 @@ function AnswerPanel({ m }) {
 
   if (!stage) return null;
   const slot = mapping.slot;
-  const blocked = mapping.status === "loading" ? "Looking for this workspace's session…" : null;
   const canSend = Boolean(slot) && preview.length > 0 && problems.length === 0 && !busy;
 
-  function send() {
+  async function send() {
+    if (!slot) return;
     setBusy(true);
     setResult(null);
-    fetch(`${BASE}/decisions/send`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        sendId: crypto.randomUUID(),
-        draft: {
-          stage,
-          choice,
-          ...(choice === "request-changes" ? { feedback } : {}),
-        },
-      }),
-    })
-      .then(async (res) => {
-        const body = await res.json().catch(() => ({}));
-        setResult({
-          status: res.ok ? "delivered" : (body.error?.code ?? "refused"),
-          record: body.record,
-        });
-      })
-      .catch(() => setResult({ status: "unreachable" }))
-      .finally(() => setBusy(false));
+    const outcome = await sendAsOwner(slot, preview);
+    setResult({ status: outcome.ok ? "delivered" : outcome.status });
+    setBusy(false);
   }
 
   return h(
@@ -537,7 +533,7 @@ function AnswerPanel({ m }) {
         "button",
         {
           type: "button",
-          onClick: send,
+          onClick: () => void send(),
           disabled: !canSend,
           style: {
             padding: "6px 14px",
@@ -555,10 +551,11 @@ function AnswerPanel({ m }) {
       h(
         Muted,
         null,
-        blocked ??
-          (slot
+        mapping.status === "loading"
+          ? "Looking for this workspace's session…"
+          : slot
             ? `Session: ${slot.title ?? slot.key}`
-            : "No Kiro Crew session is bound to this workspace, so nothing is sent."),
+            : "No Kiro Crew session is bound to this workspace, so nothing is sent.",
       ),
     ),
     result
@@ -570,6 +567,102 @@ function AnswerPanel({ m }) {
             : `Not delivered: ${result.status}`,
         )
       : null,
+  );
+}
+
+function AskPanel({ m }) {
+  const mapping = useChatSlot(m);
+  const [drafts, setDrafts] = useState({});
+  const [sent, setSent] = useState({});
+  const [busy, setBusy] = useState(null);
+  if (m.blockers.length === 0) return null;
+  const slot = mapping.slot;
+
+  async function send(blocker) {
+    const key = blocker.rel + blocker.heading;
+    const text = (drafts[key] ?? "").trim();
+    if (!slot || text.length === 0) return;
+    setBusy(key);
+    const outcome = await sendAsOwner(slot, text);
+    setSent((prev) => ({ ...prev, [key]: outcome.ok ? "delivered" : outcome.status }));
+    setBusy(null);
+  }
+
+  return h(
+    Card,
+    { title: "Answer the open questions" },
+    h(
+      Muted,
+      null,
+      slot
+        ? `Sending to the session for this workspace: ${slot.title ?? slot.key}`
+        : "No Kiro Crew session is bound to this workspace, so answers cannot be sent.",
+    ),
+    h(
+      "ul",
+      { style: { margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 12 } },
+      m.blockers.map((blocker) => {
+        const key = blocker.rel + blocker.heading;
+        return h(
+          "li",
+          {
+            key,
+            style: { borderTop: `1px solid ${T.border}`, paddingTop: 8, display: "grid", gap: 6 },
+          },
+          h(
+            "div",
+            { style: { fontSize: 13, fontWeight: 600, color: T.fg } },
+            `${blocker.unit ? `${blocker.unit} · ` : ""}${blocker.stage} · ${blocker.heading}`,
+          ),
+          h("div", { style: { fontSize: 12, color: T.muted } }, blocker.rel),
+          h("textarea", {
+            value: drafts[key] ?? "",
+            onChange: (event) => setDrafts((prev) => ({ ...prev, [key]: event.target.value })),
+            placeholder: "Your answer, sent as your own words.",
+            rows: 2,
+            style: {
+              width: "100%",
+              boxSizing: "border-box",
+              padding: 8,
+              borderRadius: 4,
+              border: `1px solid ${T.border}`,
+              background: T.card,
+              color: T.fg,
+              font: "inherit",
+            },
+          }),
+          h(
+            "div",
+            { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } },
+            h(
+              "button",
+              {
+                type: "button",
+                onClick: () => void send(blocker),
+                disabled: !slot || busy === key || (drafts[key] ?? "").trim().length === 0,
+                style: {
+                  padding: "4px 12px",
+                  borderRadius: 4,
+                  border: "none",
+                  background: T.primary,
+                  color: T.primaryFg,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                },
+              },
+              busy === key ? "Sending…" : "Send answer",
+            ),
+            sent[key]
+              ? h(
+                  Muted,
+                  null,
+                  sent[key] === "delivered" ? "Delivered." : `Not delivered: ${sent[key]}`,
+                )
+              : null,
+          ),
+        );
+      }),
+    ),
   );
 }
 
@@ -588,6 +681,7 @@ function Decisions({ m }) {
       h(Figure, { label: "questions", value: questions.totalQuestions ?? 0 }),
     ),
     h(AnswerPanel, { m }),
+    h(AskPanel, { m }),
     h(
       Card,
       { title: "Deferred items" },

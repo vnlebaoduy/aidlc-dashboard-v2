@@ -34,6 +34,7 @@ Ship `AI-DLC Ledger` as a native Kiro Crew app that reads an AI-DLC v2 run hones
 | 4 | [Native UI frames in the Ledger style](./phase-04-native-ui-frames.md) | Pending |
 | 5 | [Decision answering, exactly once](./phase-05-decision-answering.md) | Pending |
 | 6 | [Store release](./phase-06-store-release.md) | Pending |
+| 7 | [Studio parity, interactive](./phase-07-studio-parity.md) | Pending |
 
 ## Contract
 

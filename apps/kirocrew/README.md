@@ -1,6 +1,6 @@
 # AI-DLC Management Tool (Kiro Crew app)
 
-Read-only analysis of an AI-DLC v2 run, as a native Kiro Crew app.
+Analysis **and decisions** across every AI-DLC v2 project, as a native Kiro Crew app.
 
 - Backend: `backend/dist/server.js`, plain Node, bundled from `backend/src/server.ts`
   with the shared `server/scan` + `server/model` layer. The Gateway sets `PORT`,
@@ -18,11 +18,19 @@ kirocrew config set agent.apps_trusted '["aidlc-management-tool"]'
 kirocrew app enable aidlc-management-tool
 ```
 
-Then open **Apps → AI-DLC Management Tool** and name a workspace once. The path is stored in
-`<app>/data/workspace.json` (the app's own data dir, outside every workspace) and
-can be changed later by clearing it.
+Then open **Apps → AI-DLC Management Tool** and add one or more workspace paths.
+They are stored in `<app>/data/projects.json` (the app's own data dir, outside every
+workspace), validated when added and re-checked on every read.
 
 ## What it does
+
+- **Projects** — the fleet table: every registered workspace with phase, progress,
+  blockers and the folder that tells two same-named projects apart.
+- **Queue** — everything waiting on a person across all projects: gates, open
+  questions, guard stops, reviewer findings.
+- **Answers** — a gate (approve / request changes) or a question can be answered
+  from the app; the exact text is previewed and sent as your own message into the
+  project's Kiro Crew session.
 
 - **Overview** — phase, progress, blockers, gates, reviewer findings, and a warning
   when a guard is holding the run.
@@ -33,6 +41,12 @@ can be changed later by clearing it.
   exact text previewed before sending.
 - **Sources** — freshness per input, knowledge/documents and catalog states,
   reviewer passes, plugins, the resolved plan, and the execution record.
+
+## Interactive, but through AI-DLC
+
+The app changes nothing by itself. A decision is sent as your message into the
+intent's conversation, where AI-DLC validates it and records the transition; the
+app reports "delivered", never "resolved".
 
 ## Answering a gate
 
