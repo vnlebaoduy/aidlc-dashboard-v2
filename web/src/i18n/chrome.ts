@@ -94,6 +94,10 @@ export interface ChromeStrings {
     harness: string;
     record: string;
     stateFile: string;
+    execution: string;
+    /** `stages` and `workflowId` are already read; `workflowId` may be "—". */
+    runtimeMeta: (stages: number, workflowId: string) => string;
+    runtimeMissing: string;
   };
   decisionsPage: {
     tabs: {
@@ -122,6 +126,14 @@ export interface ChromeStrings {
     stageCount: (done: number, total: number) => string;
     files: (n: number) => string;
     provisional: string;
+    settings: {
+      depth: string;
+      testStrategy: string;
+      guardPolicy: string;
+      sensors: string;
+      planApproval: string;
+      collaborators: string;
+    };
   };
   overviewPage: {
     needsYou: string;
@@ -252,6 +264,11 @@ const EN: ChromeStrings = {
     harness: "harness",
     record: "intent record",
     stateFile: "state file",
+    execution: "Execution record",
+    runtimeMeta: (stages, workflowId) =>
+      `${stages} stages from runtime-graph · workflow ${workflowId}`,
+    runtimeMissing:
+      "runtime-graph.json is not present in this clone — stage spans come from the audit only",
   },
   decisionsPage: {
     tabs: {
@@ -286,6 +303,14 @@ const EN: ChromeStrings = {
     },
     stageCount: (done, total) => `${done}/${total} stages`,
     files: (n) => (n === 1 ? "1 file" : `${n} files`),
+    settings: {
+      depth: "depth",
+      testStrategy: "test strategy",
+      guardPolicy: "guard policy",
+      sensors: "sensors",
+      planApproval: "plan approval",
+      collaborators: "collaborators",
+    },
     provisional: "in flight",
   },
   overviewPage: {
@@ -417,6 +442,11 @@ const VI: ChromeStrings = {
     harness: "harness",
     record: "intent record",
     stateFile: "file trạng thái",
+    execution: "Bản ghi thực thi",
+    runtimeMeta: (stages, workflowId) =>
+      `${stages} stage từ runtime-graph · workflow ${workflowId}`,
+    runtimeMissing:
+      "Không có runtime-graph.json trong bản clone này — khoảng thời gian stage chỉ đến từ audit",
   },
   decisionsPage: {
     tabs: {
@@ -451,6 +481,14 @@ const VI: ChromeStrings = {
     },
     stageCount: (done, total) => `${done}/${total} stage`,
     files: (n) => `${n} file`,
+    settings: {
+      depth: "độ sâu",
+      testStrategy: "chiến lược test",
+      guardPolicy: "chính sách guard",
+      sensors: "sensors",
+      planApproval: "duyệt plan",
+      collaborators: "cộng sự",
+    },
     provisional: "đang chạy",
   },
   overviewPage: {

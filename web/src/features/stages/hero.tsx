@@ -19,6 +19,18 @@ export function Hero({ m }: { m: DashboardModel }) {
     : `${state.currentStageDisplay || "—"}${
         state.activeAgentDisplay ? ` · ${state.activeAgentDisplay}` : ""
       }`;
+  // Only what the record actually carries; a legacy state shows no row rather than dashes.
+  const candidates: { label: string; value?: string }[] = [
+    { label: c.stagesPage.settings.depth, value: state.depth },
+    { label: c.stagesPage.settings.testStrategy, value: state.testStrategy },
+    { label: c.stagesPage.settings.guardPolicy, value: state.guardPolicy },
+    { label: c.stagesPage.settings.sensors, value: state.sensors },
+    { label: c.stagesPage.settings.planApproval, value: state.planApproval },
+    { label: c.stagesPage.settings.collaborators, value: state.collaborators },
+  ];
+  const settings = candidates.filter((x): x is { label: string; value: string } =>
+    Boolean(x.value),
+  );
   return (
     <Section title={s.overview.sectionProgress} icon={<GaugeIcon />}>
       <div className="space-y-3">
@@ -28,6 +40,15 @@ export function Hero({ m }: { m: DashboardModel }) {
               {state.lifecyclePhase || "—"}
             </div>
             {meta ? <div className="text-sm text-muted-foreground break-words">{meta}</div> : null}
+            {settings.length > 0 ? (
+              <ul className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5 text-xs text-muted-foreground">
+                {settings.map((setting) => (
+                  <li key={setting.label} className="min-w-0">
+                    <span className="font-medium">{setting.label}</span> {setting.value}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
           <div className="text-4xl font-semibold leading-none tabular">{state.overallPct}%</div>
         </div>

@@ -56,6 +56,8 @@ const warn: WarnStrings = {
     "phán định artifact-contract và việc gán stage chuyển sang ước lượng gần đúng. Nếu cây harness nằm ở nơi khác, hãy trỏ --harness tới đó",
 
   auditEmpty: "Audit ledger trống — có thể các hook chưa từng chạy",
+  runtimeStateDivergence: (stage) =>
+    `runtime-graph ghi ${stage} đã hoàn thành, nhưng state.md chưa hiện điều đó — một trong hai đang trễ; trang này không tự chọn bên nào`,
 
   stateVersionMismatch: (stateVersion, harnessVersion, harnessDir) =>
     `state.md khai báo State Version ${stateVersion}, nhưng harness hỗ trợ ${harnessVersion} (${harnessDir}/tools/aidlc-lib.ts) — engine từ chối next, report và doctor với tổ hợp này. Không thể phán định contract theo một thế hệ khác, nên các phán định đã được bỏ qua`,

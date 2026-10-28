@@ -4,9 +4,10 @@
 import { Section } from "@/components/page";
 import { useI18n } from "@/i18n";
 import type { RunIdentity } from "@server/model/types";
+import type { RuntimeGraph } from "@server/scan/runtime-graph";
 import { FolderTreeIcon } from "lucide-react";
 
-export function IdentityCard({ id }: { id: RunIdentity }) {
+export function IdentityCard({ id, runtime }: { id: RunIdentity; runtime?: RuntimeGraph }) {
   const { s, c } = useI18n();
   const t = c.sourcesPage;
   const rows: [string, string, boolean][] = [
@@ -15,6 +16,11 @@ export function IdentityCard({ id }: { id: RunIdentity }) {
     [t.harness, id.harnessDir ?? s.page.harnessNotFound, id.harnessDir !== undefined],
     [t.record, id.record, true],
     [t.stateFile, id.stateRel, true],
+    [
+      t.execution,
+      runtime ? t.runtimeMeta(runtime.stages.length, runtime.workflowId ?? "—") : t.runtimeMissing,
+      runtime !== undefined,
+    ],
   ];
   return (
     <Section title={t.identity} icon={<FolderTreeIcon />}>

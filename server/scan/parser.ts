@@ -244,6 +244,32 @@ export interface AidlcState {
    * other panel carries.
    */
   revisionCount: string;
+  /**
+   * `## Scope Configuration` and `## Workspace State` settings, verbatim, present only
+   * when the record carries them (2.9+, with 2.11 changing the Guard Policy and
+   * collaborators defaults). Display-only: the dashboard never interprets them, so a
+   * reader can see why a gate or a check behaved the way it did.
+   */
+  depth?: string;
+  testStrategy?: string;
+  guardPolicy?: string;
+  guardsOff?: string;
+  guardsOn?: string;
+  sensors?: string;
+  learnings?: string;
+  summaryConfirmation?: string;
+  planApproval?: string;
+  collaborators?: string;
+  reviewOverride?: string;
+  plan?: string;
+  projectTypeSource?: string;
+  worktreePath?: string;
+  boltRefs?: string;
+  constructionExecution?: string;
+  unitGateRhythm?: string;
+  verificationCommand?: string;
+  /** `Languages`, `Frameworks`, `Build System` as the engine detected them. */
+  workspace?: { languages?: string; frameworks?: string; buildSystem?: string };
   phases: PhaseInfo[];
   overallDone: number;
   overallTotal: number;
@@ -525,6 +551,17 @@ export function parseState(
   const lastUpdated = extractField(text, "Last Updated");
   const revisionCount = extractField(text, "Revision Count");
   const currentBolt = extractField(text, "Current Bolt");
+  // Settings are absent on legacy records and each may be empty; undefined keeps
+  // "the record does not say" distinct from "it says nothing".
+  const setting = (label: string): string | undefined => {
+    const value = extractField(text, label);
+    return value.length > 0 ? value : undefined;
+  };
+  const languages = setting("Languages");
+  const frameworks = setting("Frameworks");
+  const buildSystem = setting("Build System");
+  const workspace =
+    languages || frameworks || buildSystem ? { languages, frameworks, buildSystem } : undefined;
 
   const declared = parseDeclaredPhaseStatus(text);
   const stagesByPhase = parseStages(text, catalogName);
@@ -600,6 +637,25 @@ export function parseState(
     activeAgentDisplay: AGENT_DISPLAY[activeAgent] ?? activeAgent,
     lastUpdated,
     revisionCount,
+    depth: setting("Depth"),
+    testStrategy: setting("Test Strategy"),
+    guardPolicy: setting("Guard Policy"),
+    guardsOff: setting("Guards Off"),
+    guardsOn: setting("Guards On"),
+    sensors: setting("Sensors"),
+    learnings: setting("Learnings"),
+    summaryConfirmation: setting("Summary Confirmation"),
+    planApproval: setting("Plan Approval"),
+    collaborators: setting("Collaborators"),
+    reviewOverride: setting("Review Override"),
+    plan: setting("Plan"),
+    projectTypeSource: setting("Project Type Source"),
+    worktreePath: setting("Worktree Path"),
+    boltRefs: setting("Bolt Refs"),
+    constructionExecution: setting("Construction Execution"),
+    unitGateRhythm: setting("Unit Gate Rhythm"),
+    verificationCommand: setting("Construction Verification Command"),
+    ...(workspace ? { workspace } : {}),
     phases,
     overallDone,
     overallTotal,

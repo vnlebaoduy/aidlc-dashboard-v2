@@ -60,6 +60,8 @@ const warn: WarnStrings = {
     "artifact-contract judgements and stage attribution fall back to approximations. If the harness tree lives elsewhere, point --harness at it",
 
   auditEmpty: "The audit ledger is empty — the hooks may never have fired",
+  runtimeStateDivergence: (stage) =>
+    `runtime-graph records ${stage} as completed, but state.md does not show it done — one of the two is behind; this page does not pick a winner`,
 
   stateVersionMismatch: (stateVersion, harnessVersion, harnessDir) =>
     `state.md declares State Version ${stateVersion}, but the harness supports ${harnessVersion} (${harnessDir}/tools/aidlc-lib.ts) — the engine refuses next, report and doctor on this combination. Contract judgements cannot be made against a different generation, so they were withheld`,

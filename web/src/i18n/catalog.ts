@@ -153,6 +153,8 @@ export interface WarnStrings {
   catalogReadFailed(harnessDir: string): string;
   readonly catalogNotFound: string;
   readonly auditEmpty: string;
+  /** `runtime-graph.json` says the stage completed; state.md does not show it done. */
+  runtimeStateDivergence(stage: string): string;
   stateVersionMismatch(stateVersion: string, harnessVersion: string, harnessDir: string): string;
   /** `stateVersion` undefined = the field was missing; present = it was unusable. */
   stateVersionUnreadable(stateVersion: string | undefined): string;

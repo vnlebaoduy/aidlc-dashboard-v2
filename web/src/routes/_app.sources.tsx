@@ -46,7 +46,7 @@ function Page() {
         <SourcesTable m={m} />
       </Section>
 
-      <IdentityCard id={m.identity} />
+      <IdentityCard id={m.identity} runtime={m.runtime} />
     </div>
   );
 }

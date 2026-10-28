@@ -34,6 +34,7 @@ import { type StageStatus, parseState } from "../scan/parser";
 import { readQuestions } from "../scan/questions";
 import { resolveState } from "../scan/resolve";
 import { buildRework } from "../scan/rework";
+import { readRuntimeGraph } from "../scan/runtime-graph";
 import { readSensorReport } from "../scan/sensors";
 import { type StageCatalog, harnessDirsWithCatalog, readStageCatalog } from "../scan/stage-catalog";
 import { buildTiming } from "../scan/timing";
@@ -338,6 +339,20 @@ export function assemble(
   const diaries = readDiaries(recordDir);
   const health = readHealth(recordDir);
   const timing = buildTiming(ledger, now);
+  const runtime = readRuntimeGraph(recordDir);
+  if (runtime) {
+    const statusBySlug: Record<string, string> = {};
+    for (const phase of state.phases) {
+      for (const stage of phase.stages) statusBySlug[stage.slug] = stage.status;
+    }
+    for (const span of runtime.stages) {
+      if (!span.completedAt) continue;
+      const status = Object.hasOwn(statusBySlug, span.slug) ? statusBySlug[span.slug] : undefined;
+      if (status !== undefined && status !== "done") {
+        warnings.push({ code: "runtime-state-divergence", stage: span.slug });
+      }
+    }
+  }
 
   // The deferral ledger needs to know where each assigned stage currently stands.
   // Keyed by slug with EVERY occurrence's status, because a Construction stage slug
@@ -651,6 +666,7 @@ export function assemble(
     deferrals,
     health,
     timing,
+    ...(runtime ? { runtime } : {}),
     blockers: buildBlockers(questions, state.currentStage, now),
     gates: buildGates(ledger, state.revisionCount, timing.awaitingStage),
     rework: buildRework(ledger),

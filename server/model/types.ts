@@ -25,6 +25,7 @@ import type { OutcomesFile } from "../scan/outcomes";
 import type { AidlcState } from "../scan/parser";
 import type { AskKind, QuestionsReport } from "../scan/questions";
 import type { ReworkReport } from "../scan/rework";
+import type { RuntimeGraph } from "../scan/runtime-graph";
 import type { SensorReport } from "../scan/sensors";
 import type { TimingReport } from "../scan/timing";
 
@@ -201,6 +202,12 @@ export type Warning =
    * clear lead is not warned about; the whole model follows it.
    */
   | { code: "harness-coexist"; harnesses: string[]; chosen: "kiro" | "claude" }
+  /**
+   * `runtime-graph.json` records a stage as completed while `aidlc-state.md` does not
+   * show it done. The engine says the graph is written at approvals, so one of the two
+   * is behind; the screen names the stage instead of picking a winner.
+   */
+  | { code: "runtime-state-divergence"; stage: string }
   | { code: "token-usage-failed"; detail: string }
   | { code: "credit-assembly-failed"; detail: string };
 
@@ -251,6 +258,11 @@ export interface DashboardModel {
    * slot, so the renderer never has to guard for it.
    */
   usage: UsageView;
+  /**
+   * The engine's per-stage execution record, when `runtime-graph.json` is present.
+   * Absent on a fresh clone; the screen says so rather than implying no stages ran.
+   */
+  runtime?: RuntimeGraph;
   /** Audit event counts by type, for the stream filter. */
   eventCounts: [string, number][];
   /** Newest audit events, for the stream panel (bounded — see assemble.ts). */
