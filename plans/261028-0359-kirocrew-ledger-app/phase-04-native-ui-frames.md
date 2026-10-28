@@ -56,6 +56,14 @@ Build the app's pages natively with `@kirocrew/app-sdk`, borrowing Studio's info
 - A reader can go from "what needs me" to the exact audit/artifact line in two clicks.
 - No page borrows Studio copy, names or visual identity.
 
+## Progress
+
+- [x] `apps/kirocrew/ui/src/index.js` renders five tabs natively (Overview, Stages & units, Timeline, Decisions, Sources) with this project's tokens, icon-plus-word statuses and a single yellow emphasis.
+- [x] Overview shows the needs-you list, gate count, findings and the guard-refusal warning; Stages matches artifacts and runtime durations; Timeline lists spans; Decisions reports ledger counts and items; Sources shows provenance, knowledge, reviews, plugins and the execution record.
+- [x] Data comes only from `/api/apps/aidlc-ledger/model`; the bundle keeps `react`, `react-dom/client` and `lucide-react` external to the host import map.
+- [x] Verified by server-rendering against `fixtures/reference` (6 tests) and by a browser harness that clicked every tab (1440 and 375, no horizontal overflow). The host shell itself is still unverified.
+- [ ] Evidence drawer and `/view` route in the app; host chrome checks; store screenshots.
+
 ## Risk Assessment
 
 - Host React version and import map constrain libraries; Mermaid and TanStack Router may not be available — verify before committing to them, and fall back to plain SVG and host routing.

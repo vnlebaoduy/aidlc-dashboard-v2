@@ -1,11 +1,11 @@
 // apps/kirocrew/backend/src/server.ts
-import * as fs19 from "node:fs";
+import * as fs27 from "node:fs";
 import { createServer } from "node:http";
 
 // server/model/assemble.ts
-import * as fs18 from "node:fs";
+import * as fs26 from "node:fs";
 import * as os2 from "node:os";
-import * as path16 from "node:path";
+import * as path24 from "node:path";
 
 // server/credit/claude/transcript-reader.ts
 import * as fs from "node:fs";
@@ -1228,29 +1228,119 @@ function readDeferrals(recordDir, opts = {}) {
   };
 }
 
-// server/scan/harness-usage.ts
+// server/scan/engine-signals.ts
 import * as fs5 from "node:fs";
 import * as path5 from "node:path";
+function readFile(pathname) {
+  try {
+    return fs5.readFileSync(pathname, "utf-8");
+  } catch {
+    return;
+  }
+}
+function parseRefusal(raw) {
+  let doc;
+  try {
+    doc = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (typeof doc !== "object" || doc === null)
+    return;
+  if (!("refusal" in doc) || typeof doc.refusal !== "object" || doc.refusal === null)
+    return;
+  const refusal = doc.refusal;
+  if (!("stage" in refusal) || typeof refusal.stage !== "string" || refusal.stage.length === 0)
+    return;
+  const count = "count" in doc && typeof doc.count === "number" ? doc.count : 1;
+  const codes = "codes" in doc && Array.isArray(doc.codes) ? doc.codes.filter((code) => typeof code === "string") : [];
+  const updatedAt = "updatedAt" in doc && typeof doc.updatedAt === "string" ? doc.updatedAt : undefined;
+  const unit = "unit" in refusal && typeof refusal.unit === "string" && refusal.unit.length > 0 ? refusal.unit : undefined;
+  return {
+    stage: refusal.stage,
+    ...unit ? { unit } : {},
+    count,
+    codes,
+    ...updatedAt ? { updatedAt } : {},
+    pendingAsk: "pendingAsk" in doc
+  };
+}
+function turnState(engineDir) {
+  const human = path5.join(engineDir, "human-turn");
+  const engine = path5.join(engineDir, "engine-touch");
+  let humanAt;
+  let engineAt;
+  try {
+    humanAt = fs5.statSync(human).mtimeMs;
+  } catch {
+    humanAt = undefined;
+  }
+  try {
+    engineAt = fs5.statSync(engine).mtimeMs;
+  } catch {
+    engineAt = undefined;
+  }
+  if (humanAt === undefined || engineAt === undefined)
+    return;
+  return humanAt >= engineAt ? "conversational" : "engine";
+}
+function readEngineSignals(recordDir) {
+  const engineDir = path5.join(recordDir, ".aidlc-engine");
+  let entries;
+  try {
+    entries = fs5.readdirSync(engineDir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  if (entries.length === 0)
+    return;
+  const refusals = [];
+  const refusalDir = path5.join(engineDir, "guard-refusals");
+  try {
+    for (const entry of fs5.readdirSync(refusalDir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(".json"))
+        continue;
+      const raw = readFile(path5.join(refusalDir, entry.name));
+      if (raw === undefined)
+        continue;
+      const parsed = parseRefusal(raw);
+      if (parsed)
+        refusals.push(parsed);
+    }
+  } catch {}
+  refusals.sort((a, b) => b.count - a.count || (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+  const turn = turnState(engineDir);
+  if (refusals.length === 0 && turn === undefined)
+    return;
+  return {
+    guardRefusals: refusals,
+    ...turn ? { turnState: turn } : {}
+  };
+}
+
+// server/scan/harness-usage.ts
+import * as fs6 from "node:fs";
+import * as path6 from "node:path";
 function sessionHarness(id, claudeDir, kiroRoot, kiroDirs) {
-  const safe = path5.basename(id);
+  const safe = path6.basename(id);
   if (safe !== id || safe === "" || safe === "." || safe === "..")
     return;
-  if (fs5.existsSync(path5.join(claudeDir, `${safe}.jsonl`)))
+  if (fs6.existsSync(path6.join(claudeDir, `${safe}.jsonl`)))
     return "claude";
   for (const d of kiroDirs) {
-    const base = path5.join(kiroRoot, d, safe);
-    if (fs5.existsSync(base) || fs5.existsSync(`${base}.json`) || fs5.existsSync(`${base}.jsonl`)) {
+    const base = path6.join(kiroRoot, d, safe);
+    if (fs6.existsSync(base) || fs6.existsSync(`${base}.json`) || fs6.existsSync(`${base}.jsonl`)) {
       return "kiro";
     }
   }
   return;
 }
 function measureHarnessTurns(root, ledger, home) {
-  const claudeDir = path5.join(home, ".claude", "projects", projectSlug(root));
-  const kiroRoot = path5.join(home, ".kiro", "sessions");
+  const claudeDir = path6.join(home, ".claude", "projects", projectSlug(root));
+  const kiroRoot = path6.join(home, ".kiro", "sessions");
   let kiroDirs = [];
   try {
-    kiroDirs = fs5.readdirSync(kiroRoot, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+    kiroDirs = fs6.readdirSync(kiroRoot, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
   } catch {}
   const turns = { kiro: 0, claude: 0, unknown: 0 };
   const seen = new Map;
@@ -1274,24 +1364,24 @@ function measureHarnessTurns(root, ledger, home) {
 }
 
 // server/scan/hooks-health.ts
-import * as fs7 from "node:fs";
-import * as path7 from "node:path";
+import * as fs8 from "node:fs";
+import * as path8 from "node:path";
 
 // server/scan/engine-dir.ts
-import * as fs6 from "node:fs";
-import * as path6 from "node:path";
+import * as fs7 from "node:fs";
+import * as path7 from "node:path";
 var ENGINE_DIR = ".aidlc-engine";
 function engineReadDir(recordDir, name, legacyName) {
-  const engine = path6.join(recordDir, ENGINE_DIR);
-  const current = path6.join(engine, name);
+  const engine = path7.join(recordDir, ENGINE_DIR);
+  const current = path7.join(engine, name);
   try {
-    const engineStat = fs6.lstatSync(engine, { throwIfNoEntry: false });
+    const engineStat = fs7.lstatSync(engine, { throwIfNoEntry: false });
     if (engineStat !== undefined && !engineStat.isDirectory())
       return current;
-    if (fs6.lstatSync(current, { throwIfNoEntry: false }) !== undefined)
+    if (fs7.lstatSync(current, { throwIfNoEntry: false }) !== undefined)
       return current;
-    const legacy = path6.join(recordDir, legacyName);
-    return fs6.existsSync(legacy) ? legacy : current;
+    const legacy = path7.join(recordDir, legacyName);
+    return fs7.existsSync(legacy) ? legacy : current;
   } catch {
     return current;
   }
@@ -1320,7 +1410,7 @@ function parseDrops(text) {
 }
 function readText(p) {
   try {
-    return fs7.readFileSync(p, "utf-8");
+    return fs8.readFileSync(p, "utf-8");
   } catch {
     return;
   }
@@ -1329,7 +1419,7 @@ function readHealth(recordDir) {
   const healthDir = engineReadDir(recordDir, "hooks-health", ".aidlc-hooks-health");
   let entries = [];
   try {
-    entries = fs7.readdirSync(healthDir);
+    entries = fs8.readdirSync(healthDir);
   } catch {}
   const names = new Set;
   for (const f of entries) {
@@ -1340,8 +1430,8 @@ function readHealth(recordDir) {
   }
   const hooks = [];
   for (const name of [...names].sort()) {
-    const lastRaw = readText(path7.join(healthDir, `${name}.last`));
-    const dropsRaw = readText(path7.join(healthDir, `${name}.drops`));
+    const lastRaw = readText(path8.join(healthDir, `${name}.last`));
+    const dropsRaw = readText(path8.join(healthDir, `${name}.drops`));
     const dropRows = dropsRaw ? parseDrops(dropsRaw) : [];
     const byReason = new Map;
     let degraded = 0;
@@ -1362,7 +1452,7 @@ function readHealth(recordDir) {
   }
   let stopGuard;
   const stopDir = engineReadDir(recordDir, "stop-hook", ".aidlc-stop-hook");
-  const guardRaw = readText(path7.join(stopDir, "block-count.json"));
+  const guardRaw = readText(path8.join(stopDir, "block-count.json"));
   if (guardRaw) {
     try {
       const j = JSON.parse(guardRaw);
@@ -1374,16 +1464,158 @@ function readHealth(recordDir) {
   const fired = hooks.map((h) => h.lastFired).filter((t) => !!t);
   return {
     hooks,
-    firstFired: readText(path7.join(healthDir, ".first-fired"))?.trim() || undefined,
+    firstFired: readText(path8.join(healthDir, ".first-fired"))?.trim() || undefined,
     lastActivity: fired.length > 0 ? fired.sort()[fired.length - 1] : undefined,
     stopGuard,
     totalDrops: hooks.reduce((n, h) => n + h.drops, 0)
   };
 }
 
-// server/scan/matrix.ts
+// server/scan/intents.ts
+import * as fs9 from "node:fs";
+import * as path9 from "node:path";
+function clean(raw) {
+  return raw.replace(/^\uFEFF/, "").replace(/^\s*\/\/.*$/gm, "").replace(/,(\s*[\]}])/g, "$1");
+}
+function str(value, key) {
+  if (typeof value !== "object" || value === null)
+    return;
+  const field = Reflect.get(value, key);
+  return typeof field === "string" && field.length > 0 ? field : undefined;
+}
+function rowOf(value) {
+  if (typeof value !== "object" || value === null)
+    return;
+  const uuid = str(value, "uuid");
+  const slug = str(value, "slug");
+  const dirName = str(value, "dirName");
+  const scope = str(value, "scope");
+  const status = str(value, "status");
+  const rawRepos = Reflect.get(value, "repos");
+  const repos = Array.isArray(rawRepos) ? rawRepos.filter((repo) => typeof repo === "string") : undefined;
+  const row = {
+    ...uuid ? { uuid } : {},
+    ...slug ? { slug } : {},
+    ...dirName ? { dirName } : {},
+    ...scope ? { scope } : {},
+    ...status ? { status } : {},
+    ...repos && repos.length > 0 ? { repos } : {}
+  };
+  return Object.keys(row).length > 0 ? row : undefined;
+}
+function readIntentRegistry(spaceDir) {
+  const file = path9.join(spaceDir, "intents", "intents.json");
+  let raw;
+  try {
+    raw = fs9.readFileSync(file, "utf-8");
+  } catch {
+    return;
+  }
+  const doc = (() => {
+    try {
+      return JSON.parse(clean(raw));
+    } catch {
+      return;
+    }
+  })();
+  if (!Array.isArray(doc))
+    return;
+  return doc.map(rowOf).filter((row) => row !== undefined);
+}
+function listSpaces(root) {
+  const dir = path9.join(root, "aidlc", "spaces");
+  try {
+    return fs9.readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+  } catch {
+    return [];
+  }
+}
+
+// server/scan/knowledge.ts
 import * as fs10 from "node:fs";
 import * as path10 from "node:path";
+function countFiles(dir) {
+  let entries;
+  try {
+    entries = fs10.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
+  let total = 0;
+  for (const entry of entries) {
+    if (entry.isDirectory())
+      total += countFiles(path10.join(dir, entry.name));
+    else if (entry.isFile())
+      total += 1;
+  }
+  return total;
+}
+function subdirs(dir) {
+  try {
+    return fs10.readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+  } catch {
+    return [];
+  }
+}
+function tallyIndex(raw) {
+  let doc;
+  try {
+    doc = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (typeof doc !== "object" || doc === null || !("documents" in doc))
+    return;
+  if (!Array.isArray(doc.documents))
+    return;
+  const tally = { indexed: 0, states: {}, tombstones: 0, linked: 0 };
+  for (const row of doc.documents) {
+    if (typeof row !== "object" || row === null)
+      continue;
+    tally.indexed += 1;
+    const extraction = "extraction" in row ? row.extraction : undefined;
+    const state = typeof extraction === "object" && extraction !== null && "state" in extraction && typeof extraction.state === "string" ? extraction.state : "unknown";
+    tally.states[state] = (tally.states[state] ?? 0) + 1;
+    if ("tombstone" in row && row.tombstone)
+      tally.tombstones += 1;
+    const source = "source" in row ? row.source : undefined;
+    if (typeof source === "object" && source !== null && "kind" in source && source.kind === "linked")
+      tally.linked += 1;
+  }
+  return tally;
+}
+function readKnowledge(spaceDir) {
+  const memoryDir = path10.join(spaceDir, "memory");
+  const memoryFiles = ["org.md", "team.md", "project.md"].filter((name) => fs10.existsSync(path10.join(memoryDir, name)));
+  const phaseRules = countFiles(path10.join(memoryDir, "phases"));
+  const knowledgeDir = path10.join(spaceDir, "knowledge");
+  const documentFiles = countFiles(path10.join(knowledgeDir, "documents"));
+  const indexFile = path10.join(knowledgeDir, "documentkb", "index.json");
+  let tally;
+  try {
+    tally = tallyIndex(fs10.readFileSync(indexFile, "utf-8"));
+  } catch {
+    tally = undefined;
+  }
+  const codekbRepos = subdirs(path10.join(spaceDir, "codekb"));
+  const nothing = memoryFiles.length === 0 && phaseRules === 0 && documentFiles === 0 && tally === undefined && codekbRepos.length === 0;
+  if (nothing)
+    return;
+  const states = tally ? Object.entries(tally.states).map(([state, count]) => ({ state, count })).sort((a, b) => b.count - a.count || a.state.localeCompare(b.state)) : undefined;
+  return {
+    documentFiles,
+    ...tally ? { indexedDocuments: tally.indexed, tombstones: tally.tombstones } : {},
+    ...states ? { states } : {},
+    ...tally && tally.linked > 0 ? { linked: tally.linked } : {},
+    codekbRepos,
+    memoryFiles,
+    phaseRules
+  };
+}
+
+// server/scan/matrix.ts
+import * as fs13 from "node:fs";
+import * as path13 from "node:path";
 
 // server/scan/parser.ts
 var PHASE_ORDER = [
@@ -1634,6 +1866,14 @@ function parseState(text, catalogName) {
   const lastUpdated = extractField(text, "Last Updated");
   const revisionCount = extractField(text, "Revision Count");
   const currentBolt = extractField(text, "Current Bolt");
+  const setting = (label) => {
+    const value = extractField(text, label);
+    return value.length > 0 ? value : undefined;
+  };
+  const languages = setting("Languages");
+  const frameworks = setting("Frameworks");
+  const buildSystem = setting("Build System");
+  const workspace = languages || frameworks || buildSystem ? { languages, frameworks, buildSystem } : undefined;
   const declared = parseDeclaredPhaseStatus(text);
   const stagesByPhase = parseStages(text, catalogName);
   const phases = [];
@@ -1683,6 +1923,25 @@ function parseState(text, catalogName) {
     activeAgentDisplay: AGENT_DISPLAY[activeAgent] ?? activeAgent,
     lastUpdated,
     revisionCount,
+    depth: setting("Depth"),
+    testStrategy: setting("Test Strategy"),
+    guardPolicy: setting("Guard Policy"),
+    guardsOff: setting("Guards Off"),
+    guardsOn: setting("Guards On"),
+    sensors: setting("Sensors"),
+    learnings: setting("Learnings"),
+    summaryConfirmation: setting("Summary Confirmation"),
+    planApproval: setting("Plan Approval"),
+    collaborators: setting("Collaborators"),
+    reviewOverride: setting("Review Override"),
+    plan: setting("Plan"),
+    projectTypeSource: setting("Project Type Source"),
+    worktreePath: setting("Worktree Path"),
+    boltRefs: setting("Bolt Refs"),
+    constructionExecution: setting("Construction Execution"),
+    unitGateRhythm: setting("Unit Gate Rhythm"),
+    verificationCommand: setting("Construction Verification Command"),
+    ...workspace ? { workspace } : {},
     phases,
     overallDone,
     overallTotal,
@@ -1754,16 +2013,16 @@ function parseUnitProgress(text) {
 }
 
 // server/scan/stage-catalog.ts
-import * as fs8 from "node:fs";
-import * as path8 from "node:path";
-var CATALOG_SUBPATH = path8.join("tools", "data", "stage-graph.json");
+import * as fs11 from "node:fs";
+import * as path11 from "node:path";
+var CATALOG_SUBPATH = path11.join("tools", "data", "stage-graph.json");
 var KNOWN_HARNESS_DIRS = [".claude", ".kiro", ".aidlc"];
 function isHarnessDirName(name) {
   return /^\.[a-z0-9][a-z0-9._-]*$/i.test(name);
 }
 function hasCatalog(root, harness) {
   try {
-    return fs8.statSync(path8.join(root, harness, CATALOG_SUBPATH)).isFile();
+    return fs11.statSync(path11.join(root, harness, CATALOG_SUBPATH)).isFile();
   } catch {
     return false;
   }
@@ -1775,7 +2034,7 @@ function findHarnessDir(root) {
   }
   let entries;
   try {
-    entries = fs8.readdirSync(root, { withFileTypes: true });
+    entries = fs11.readdirSync(root, { withFileTypes: true });
   } catch {
     return;
   }
@@ -1797,7 +2056,7 @@ function harnessDirsWithCatalog(root) {
   }
   let entries;
   try {
-    entries = fs8.readdirSync(root, { withFileTypes: true });
+    entries = fs11.readdirSync(root, { withFileTypes: true });
   } catch {
     return found;
   }
@@ -1814,7 +2073,7 @@ function harnessDirsWithCatalog(root) {
 var STATE_VERSION_RE = /CURRENT_STATE_VERSION\s*(?::\s*[^=]+)?=\s*["'`](\d+)["'`]/;
 function readHarnessStateVersion(root, harness) {
   try {
-    const text = fs8.readFileSync(path8.join(root, harness, "tools", "aidlc-lib.ts"), "utf-8");
+    const text = fs11.readFileSync(path11.join(root, harness, "tools", "aidlc-lib.ts"), "utf-8");
     return STATE_VERSION_RE.exec(text)?.[1];
   } catch {
     return;
@@ -1840,10 +2099,10 @@ function readStageCatalog(root, harnessDir) {
   const harness = harnessDir ?? findHarnessDir(root);
   if (!harness)
     return;
-  const sourcePath = path8.join(root, harness, CATALOG_SUBPATH);
+  const sourcePath = path11.join(root, harness, CATALOG_SUBPATH);
   let raw;
   try {
-    raw = fs8.readFileSync(sourcePath, "utf-8");
+    raw = fs11.readFileSync(sourcePath, "utf-8");
   } catch {
     return;
   }
@@ -1872,7 +2131,8 @@ function readStageCatalog(root, harnessDir) {
       optionalProduces: asStringArray(r.optional_produces),
       producesKinds: asKindMap(r.produces_kinds),
       forEach: typeof r.for_each === "string" ? r.for_each : undefined,
-      sensors: asStringArray(r.sensors)
+      sensors: asStringArray(r.sensors),
+      enabled: r.enabled !== false
     });
   }
   if (stages.length === 0)
@@ -1882,6 +2142,7 @@ function readStageCatalog(root, harnessDir) {
     bySlug: new Map(stages.map((s) => [s.slug, s])),
     sourcePath,
     harnessDir: harness,
+    disabled: stages.filter((s) => !s.enabled).map((s) => s.slug),
     ...(() => {
       const v = readHarnessStateVersion(root, harness);
       return v ? { stateVersion: v } : {};
@@ -1907,8 +2168,8 @@ function vacuouslyCovered(stage, kind) {
 }
 
 // server/scan/unit-info.ts
-import * as fs9 from "node:fs";
-import * as path9 from "node:path";
+import * as fs12 from "node:fs";
+import * as path12 from "node:path";
 var DESCRIPTION_LABEL = /^\*\*(?:Description|Mô tả|Summary|Purpose|Mục đích)\s*:?\*\*\s*:?\s*/i;
 var TITLE_HEADER = /^(?:name|title|tên)$/i;
 var COMPLEXITY_HEADER = /^(?:complexity|độ phức tạp|size)$/i;
@@ -1971,7 +2232,7 @@ function readUnitInfo(recordDir, slugs) {
   if (slugs.length === 0)
     return {};
   try {
-    const text = fs9.readFileSync(path9.join(recordDir, "inception", "units-generation", "unit-of-work.md"), "utf-8");
+    const text = fs12.readFileSync(path12.join(recordDir, "inception", "units-generation", "unit-of-work.md"), "utf-8");
     return parseUnitInfo(text, slugs);
   } catch {
     return {};
@@ -2127,7 +2388,7 @@ function parseBoltDag(graphText) {
 function readSegment(recordDir, unit, stageSlug) {
   let entries;
   try {
-    entries = fs10.readdirSync(path10.join(recordDir, "construction", unit, stageSlug), {
+    entries = fs13.readdirSync(path13.join(recordDir, "construction", unit, stageSlug), {
       withFileTypes: true
     });
   } catch {
@@ -2222,7 +2483,7 @@ var RUNTIME_GRAPH_FILE = "runtime-graph.json";
 function scanConstructionMatrix(recordDir, constructionStages, catalog, lifecycle, stateCompat) {
   let graphText;
   try {
-    graphText = fs10.readFileSync(path10.join(recordDir, RUNTIME_GRAPH_FILE), "utf-8");
+    graphText = fs13.readFileSync(path13.join(recordDir, RUNTIME_GRAPH_FILE), "utf-8");
   } catch {
     return;
   }
@@ -2240,8 +2501,8 @@ function scanConstructionMatrix(recordDir, constructionStages, catalog, lifecycl
 }
 
 // server/scan/memory-diary.ts
-import * as fs11 from "node:fs";
-import * as path11 from "node:path";
+import * as fs14 from "node:fs";
+import * as path14 from "node:path";
 var HEADING_TO_AXIS = {
   interpretations: "interpretations",
   deviations: "deviations",
@@ -2336,16 +2597,16 @@ function normalizeRecords(stages) {
 }
 function isDir2(p) {
   try {
-    return fs11.statSync(p).isDirectory();
+    return fs14.statSync(p).isDirectory();
   } catch {
     return false;
   }
 }
 function readOne(recordDir, relParts, phase, stage, unit) {
-  const abs = path11.join(recordDir, ...relParts, "memory.md");
+  const abs = path14.join(recordDir, ...relParts, "memory.md");
   let text;
   try {
-    text = fs11.readFileSync(abs, "utf-8");
+    text = fs14.readFileSync(abs, "utf-8");
   } catch {
     return;
   }
@@ -2366,24 +2627,24 @@ function readOne(recordDir, relParts, phase, stage, unit) {
 function readDiaries(recordDir) {
   const stages = [];
   for (const phase of PHASE_DIRS2) {
-    const phaseAbs = path11.join(recordDir, phase);
+    const phaseAbs = path14.join(recordDir, phase);
     if (!isDir2(phaseAbs))
       continue;
     let children;
     try {
-      children = fs11.readdirSync(phaseAbs);
+      children = fs14.readdirSync(phaseAbs);
     } catch {
       continue;
     }
     for (const child of children.sort()) {
-      const childAbs = path11.join(phaseAbs, child);
+      const childAbs = path14.join(phaseAbs, child);
       if (!isDir2(childAbs))
         continue;
       let grandchildren = [];
       try {
-        grandchildren = fs11.readdirSync(childAbs);
+        grandchildren = fs14.readdirSync(childAbs);
       } catch {}
-      const stageSubdirs = grandchildren.filter((g) => isDir2(path11.join(childAbs, g)));
+      const stageSubdirs = grandchildren.filter((g) => isDir2(path14.join(childAbs, g)));
       if (stageSubdirs.length > 0) {
         for (const stage of stageSubdirs.sort()) {
           const d = readOne(recordDir, [phase, child, stage], phase, stage, child);
@@ -2409,44 +2670,44 @@ function readDiaries(recordDir) {
 }
 
 // server/scan/outcomes.ts
-import * as fs13 from "node:fs";
+import * as fs16 from "node:fs";
 
 // server/scan/open-file.ts
-import * as fs12 from "node:fs";
-import * as path12 from "node:path";
+import * as fs15 from "node:fs";
+import * as path15 from "node:path";
 var ALLOWED_EXT = new Set([".md", ".html", ".json"]);
 function resolveArtifact(recordDir, rel) {
   if (!rel || rel.length > 512)
     return { ok: false, refusal: { code: "bad-rel" }, status: 400 };
   if (rel.includes("\x00"))
     return { ok: false, refusal: { code: "bad-chars" }, status: 400 };
-  const base = path12.resolve(recordDir);
-  const abs = path12.resolve(base, rel);
-  if (abs !== base && !abs.startsWith(base + path12.sep)) {
+  const base = path15.resolve(recordDir);
+  const abs = path15.resolve(base, rel);
+  if (abs !== base && !abs.startsWith(base + path15.sep)) {
     return { ok: false, refusal: { code: "outside-record" }, status: 403 };
   }
-  if (!ALLOWED_EXT.has(path12.extname(abs).toLowerCase())) {
+  if (!ALLOWED_EXT.has(path15.extname(abs).toLowerCase())) {
     return { ok: false, refusal: { code: "extension", allowed: [...ALLOWED_EXT] }, status: 403 };
   }
   let real;
   try {
-    real = fs12.realpathSync(abs);
+    real = fs15.realpathSync(abs);
   } catch {
     return { ok: false, refusal: { code: "not-found" }, status: 404 };
   }
   const realBase = (() => {
     try {
-      return fs12.realpathSync(base);
+      return fs15.realpathSync(base);
     } catch {
       return base;
     }
   })();
-  if (real !== realBase && !real.startsWith(realBase + path12.sep)) {
+  if (real !== realBase && !real.startsWith(realBase + path15.sep)) {
     return { ok: false, refusal: { code: "symlink-escape" }, status: 403 };
   }
   let st;
   try {
-    st = fs12.statSync(real);
+    st = fs15.statSync(real);
   } catch {
     return { ok: false, refusal: { code: "stat-failed" }, status: 404 };
   }
@@ -2468,7 +2729,7 @@ function readOutcomes(root, recordDir) {
   if (!jailed.ok)
     return null;
   try {
-    const st = fs13.statSync(jailed.real);
+    const st = fs16.statSync(jailed.real);
     return {
       rel: OUTCOMES_REL,
       where: base === recordDir ? "record" : "workspace",
@@ -2480,9 +2741,67 @@ function readOutcomes(root, recordDir) {
   }
 }
 
+// server/scan/plan.ts
+import * as fs17 from "node:fs";
+import * as path16 from "node:path";
+function readPlan(recordDir) {
+  let raw;
+  try {
+    raw = fs17.readFileSync(path16.join(recordDir, ".aidlc-engine", "plan.json"), "utf-8");
+  } catch {
+    return;
+  }
+  let doc;
+  try {
+    doc = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (!Array.isArray(doc))
+    return;
+  const rows = [];
+  for (const row of doc) {
+    if (typeof row !== "object" || row === null)
+      continue;
+    const slug = "slug" in row && typeof row.slug === "string" ? row.slug : undefined;
+    const phase = "phase" in row && typeof row.phase === "string" ? row.phase : "";
+    const action = "action" in row && (row.action === "EXECUTE" || row.action === "SKIP") ? row.action : undefined;
+    if (!slug || !action)
+      continue;
+    rows.push({ slug, phase, action });
+  }
+  return rows.length > 0 ? rows : undefined;
+}
+
+// server/scan/plugins.ts
+import * as fs18 from "node:fs";
+import * as path17 from "node:path";
+function readPluginInventory(root, harnessDir) {
+  const rel = path17.posix.join(harnessDir, "tools", "data", "harness.json");
+  let raw;
+  try {
+    raw = fs18.readFileSync(path17.join(root, harnessDir, "tools", "data", "harness.json"), "utf-8");
+  } catch {
+    return;
+  }
+  let doc;
+  try {
+    doc = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (typeof doc !== "object" || doc === null || !("plugins" in doc))
+    return;
+  const plugins = doc.plugins;
+  if (!Array.isArray(plugins))
+    return;
+  const enabled = plugins.filter((name) => typeof name === "string" && name.length > 0);
+  return { enabled, source: rel };
+}
+
 // server/scan/questions.ts
-import * as fs14 from "node:fs";
-import * as path13 from "node:path";
+import * as fs19 from "node:fs";
+import * as path18 from "node:path";
 var PHASE_DIRS3 = ["initialization", "ideation", "inception", "construction", "operation"];
 var H2_RE2 = /^##\s/;
 var QUESTION_HEADING_RE = /^##\s+\[?([QF]\d+(?:-?[A-Za-z0-9]+)?)\]?(?:$|[\s.:\]])/;
@@ -2520,16 +2839,16 @@ function parseQuestions(text) {
 }
 function statMtime2(p) {
   try {
-    return fs14.statSync(p).mtime.toISOString().replace(/\.\d{3}Z$/, "Z");
+    return fs19.statSync(p).mtime.toISOString().replace(/\.\d{3}Z$/, "Z");
   } catch {
     return "";
   }
 }
 function readFileEntry(recordDir, relParts, phase, stage, unit) {
-  const abs = path13.join(recordDir, ...relParts);
+  const abs = path18.join(recordDir, ...relParts);
   let text;
   try {
-    text = fs14.readFileSync(abs, "utf-8");
+    text = fs19.readFileSync(abs, "utf-8");
   } catch {
     return;
   }
@@ -2547,7 +2866,7 @@ function readFileEntry(recordDir, relParts, phase, stage, unit) {
 function scanStageDir(recordDir, relParts, phase, stage, unit, into) {
   let entries;
   try {
-    entries = fs14.readdirSync(path13.join(recordDir, ...relParts));
+    entries = fs19.readdirSync(path18.join(recordDir, ...relParts));
   } catch {
     return;
   }
@@ -2561,7 +2880,7 @@ function scanStageDir(recordDir, relParts, phase, stage, unit, into) {
 }
 function isDir3(p) {
   try {
-    return fs14.statSync(p).isDirectory();
+    return fs19.statSync(p).isDirectory();
   } catch {
     return false;
   }
@@ -2569,24 +2888,24 @@ function isDir3(p) {
 function readQuestions(recordDir) {
   const files = [];
   for (const phase of PHASE_DIRS3) {
-    const phaseAbs = path13.join(recordDir, phase);
+    const phaseAbs = path18.join(recordDir, phase);
     if (!isDir3(phaseAbs))
       continue;
     let children;
     try {
-      children = fs14.readdirSync(phaseAbs);
+      children = fs19.readdirSync(phaseAbs);
     } catch {
       continue;
     }
     for (const child of children.sort()) {
-      const childAbs = path13.join(phaseAbs, child);
+      const childAbs = path18.join(phaseAbs, child);
       if (!isDir3(childAbs))
         continue;
       let grandchildren = [];
       try {
-        grandchildren = fs14.readdirSync(childAbs);
+        grandchildren = fs19.readdirSync(childAbs);
       } catch {}
-      const stageSubdirs = grandchildren.filter((g) => isDir3(path13.join(childAbs, g)));
+      const stageSubdirs = grandchildren.filter((g) => isDir3(path18.join(childAbs, g)));
       if (stageSubdirs.length > 0) {
         for (const stage of stageSubdirs.sort()) {
           scanStageDir(recordDir, [phase, child, stage], phase, stage, child, files);
@@ -2607,8 +2926,8 @@ function readQuestions(recordDir) {
 }
 
 // server/scan/resolve.ts
-import * as fs15 from "node:fs";
-import * as path14 from "node:path";
+import * as fs20 from "node:fs";
+import * as path19 from "node:path";
 var ACTIVE_SPACE_POINTER = "active-space";
 var ACTIVE_INTENT_POINTER = "active-intent";
 var DEFAULT_SPACE = "default";
@@ -2617,19 +2936,19 @@ var ACTIVE_SPACE_GLOB = `aidlc/${ACTIVE_SPACE_POINTER}`;
 var ACTIVE_INTENT_GLOB = `aidlc/spaces/*/intents/${ACTIVE_INTENT_POINTER}`;
 function readCursor(file) {
   try {
-    const raw = fs15.readFileSync(file, "utf-8").trim();
+    const raw = fs20.readFileSync(file, "utf-8").trim();
     return raw;
   } catch {
     return "";
   }
 }
 function activeSpace(rootFs) {
-  const raw = readCursor(path14.join(rootFs, "aidlc", ACTIVE_SPACE_POINTER));
+  const raw = readCursor(path19.join(rootFs, "aidlc", ACTIVE_SPACE_POINTER));
   return raw.length > 0 ? raw : DEFAULT_SPACE;
 }
 function hasState(recordDir) {
   try {
-    return fs15.existsSync(path14.join(recordDir, STATE_FILE));
+    return fs20.existsSync(path19.join(recordDir, STATE_FILE));
   } catch {
     return false;
   }
@@ -2637,18 +2956,18 @@ function hasState(recordDir) {
 function listIntentDirs(intentsDir) {
   let entries;
   try {
-    entries = fs15.readdirSync(intentsDir);
+    entries = fs20.readdirSync(intentsDir);
   } catch {
     return [];
   }
-  return entries.filter((name) => hasState(path14.join(intentsDir, name))).sort();
+  return entries.filter((name) => hasState(path19.join(intentsDir, name))).sort();
 }
 function resolveState(rootFs) {
   const space = activeSpace(rootFs);
-  const intentsDir = path14.join(rootFs, "aidlc", "spaces", space, "intents");
+  const intentsDir = path19.join(rootFs, "aidlc", "spaces", space, "intents");
   const rel = (record) => `aidlc/spaces/${space}/intents/${record}/${STATE_FILE}`;
-  const cursor = readCursor(path14.join(intentsDir, ACTIVE_INTENT_POINTER));
-  if (cursor.length > 0 && hasState(path14.join(intentsDir, cursor))) {
+  const cursor = readCursor(path19.join(intentsDir, ACTIVE_INTENT_POINTER));
+  if (cursor.length > 0 && hasState(path19.join(intentsDir, cursor))) {
     return { kind: "ok", rel: rel(cursor) };
   }
   const records = listIntentDirs(intentsDir);
@@ -2657,6 +2976,120 @@ function resolveState(rootFs) {
   if (records.length === 0)
     return { kind: "none" };
   return { kind: "ambiguous" };
+}
+
+// server/scan/reviews.ts
+import * as fs21 from "node:fs";
+import * as path20 from "node:path";
+var SKIP_DIRS = new Set([".aidlc-engine", "audit", "node_modules", ".git", "verification"]);
+var MAX_DEPTH = 5;
+function field(text, label) {
+  const match = new RegExp(`^\\*\\*${label}:\\*\\*[ \\t]*(.+)$`, "m").exec(text);
+  const value = match?.[1]?.trim();
+  return value && value.length > 0 ? value : undefined;
+}
+function countNewFindings(text) {
+  const start = text.indexOf("**New findings**");
+  if (start < 0)
+    return;
+  const rest = text.slice(start + "**New findings**".length);
+  const lines = rest.split(/\r?\n/);
+  let rows = 0;
+  let inTable = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("|")) {
+      if (!inTable) {
+        inTable = true;
+        continue;
+      }
+      if (/^\|[\s|:-]+\|$/.test(trimmed))
+        continue;
+      rows += 1;
+      continue;
+    }
+    if (inTable)
+      break;
+  }
+  return rows;
+}
+function recordReview(recordDir, dir, file) {
+  const match = /^review-(\d+)\.md$/.exec(file);
+  if (!match?.[1])
+    return;
+  const full = path20.join(dir, file);
+  let text;
+  try {
+    text = fs21.readFileSync(full, "utf-8");
+  } catch {
+    return;
+  }
+  const relParts = path20.relative(recordDir, full).split(path20.sep);
+  const reviewsAt = relParts.lastIndexOf("reviews");
+  if (reviewsAt < 1)
+    return;
+  const stage = relParts[reviewsAt - 1];
+  if (!stage)
+    return;
+  const constructionAt = relParts.indexOf("construction");
+  const unit = constructionAt >= 0 && reviewsAt - constructionAt >= 3 ? relParts[constructionAt + 1] : undefined;
+  const verdictText = field(text, "Verdict");
+  const verdict = verdictText === "READY" || verdictText === "NOT-READY" ? verdictText : undefined;
+  let updatedAt;
+  try {
+    updatedAt = fs21.statSync(full).mtime.toISOString();
+  } catch {
+    updatedAt = undefined;
+  }
+  const findings = countNewFindings(text);
+  return {
+    rel: relParts.join("/"),
+    stage,
+    ...unit ? { unit } : {},
+    number: Number(match[1]),
+    ...verdict ? { verdict } : {},
+    ...field(text, "Reviewer") ? { reviewer: field(text, "Reviewer") } : {},
+    ...field(text, "Iteration") ? { iteration: field(text, "Iteration") } : {},
+    ...updatedAt ? { updatedAt } : {},
+    ...findings !== undefined ? { findings } : {}
+  };
+}
+function walk(recordDir, dir, depth, out) {
+  if (depth > MAX_DEPTH)
+    return;
+  let entries;
+  try {
+    entries = fs21.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || SKIP_DIRS.has(entry.name))
+      continue;
+    const child = path20.join(dir, entry.name);
+    if (entry.name === "reviews") {
+      let files;
+      try {
+        files = fs21.readdirSync(child);
+      } catch {
+        continue;
+      }
+      for (const file of files.sort()) {
+        const review = recordReview(recordDir, child, file);
+        if (review)
+          out.push(review);
+      }
+      continue;
+    }
+    walk(recordDir, child, depth + 1, out);
+  }
+}
+function readReviews(recordDir) {
+  const out = [];
+  walk(recordDir, recordDir, 0, out);
+  if (out.length === 0)
+    return;
+  return out.sort((a, b) => a.stage.localeCompare(b.stage) || (a.unit ?? "").localeCompare(b.unit ?? "") || a.number - b.number);
 }
 
 // server/scan/rework.ts
@@ -2747,9 +3180,70 @@ function buildRework(ledger) {
   };
 }
 
+// server/scan/runtime-graph.ts
+import * as fs22 from "node:fs";
+import * as path21 from "node:path";
+function seconds(start, end) {
+  if (!start || !end)
+    return;
+  const from = Date.parse(start);
+  const to = Date.parse(end);
+  if (Number.isNaN(from) || Number.isNaN(to) || to < from)
+    return;
+  return Math.round((to - from) / 1000);
+}
+function readRuntimeGraph(recordDir) {
+  let raw;
+  try {
+    raw = fs22.readFileSync(path21.join(recordDir, "runtime-graph.json"), "utf-8");
+  } catch {
+    return;
+  }
+  let doc;
+  try {
+    doc = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (typeof doc !== "object" || doc === null || !("stages" in doc))
+    return;
+  const rows = doc.stages;
+  if (!Array.isArray(rows))
+    return;
+  const stages = [];
+  for (const row of rows) {
+    if (typeof row !== "object" || row === null)
+      continue;
+    if (!("stage_slug" in row) || typeof row.stage_slug !== "string" || row.stage_slug.length === 0)
+      continue;
+    const startedAt = "started_at" in row && typeof row.started_at === "string" ? row.started_at : undefined;
+    const completedAt = "completed_at" in row && typeof row.completed_at === "string" ? row.completed_at : undefined;
+    const agent = "agent" in row && typeof row.agent === "string" ? row.agent : undefined;
+    const outcome = "outcome" in row && typeof row.outcome === "string" ? row.outcome : undefined;
+    const span = seconds(startedAt, completedAt);
+    stages.push({
+      slug: row.stage_slug,
+      ...startedAt ? { startedAt } : {},
+      ...completedAt ? { completedAt } : {},
+      ...span !== undefined ? { elapsedSec: span } : {},
+      ...agent ? { agent } : {},
+      ...outcome ? { outcome } : {}
+    });
+  }
+  if (stages.length === 0)
+    return;
+  const workflowId = "workflow_id" in doc && typeof doc.workflow_id === "string" ? doc.workflow_id : undefined;
+  const startedAt = "started_at" in doc && typeof doc.started_at === "string" ? doc.started_at : undefined;
+  return {
+    ...workflowId ? { workflowId } : {},
+    ...startedAt ? { startedAt } : {},
+    stages
+  };
+}
+
 // server/scan/sensors.ts
-import * as fs16 from "node:fs";
-import * as path15 from "node:path";
+import * as fs23 from "node:fs";
+import * as path22 from "node:path";
 var FIELD_RE2 = /^\*\*([^*]+)\*\*:[ \t]*(.*)$/;
 var NOT_FINDINGS = new Set([
   "pass",
@@ -2862,14 +3356,14 @@ function readDetailBodies(recordDir) {
   const root = engineReadDir(recordDir, "sensors", ".aidlc-sensors");
   let stageDirs;
   try {
-    stageDirs = fs16.readdirSync(root);
+    stageDirs = fs23.readdirSync(root);
   } catch {
     return out;
   }
   for (const stage of stageDirs) {
     let files;
     try {
-      files = fs16.readdirSync(path15.join(root, stage));
+      files = fs23.readdirSync(path22.join(root, stage));
     } catch {
       continue;
     }
@@ -2878,7 +3372,7 @@ function readDetailBodies(recordDir) {
         continue;
       let text;
       try {
-        text = fs16.readFileSync(path15.join(root, stage, f), "utf-8");
+        text = fs23.readFileSync(path22.join(root, stage, f), "utf-8");
       } catch {
         continue;
       }
@@ -3403,12 +3897,46 @@ function buildTiming(ledger, nowTs) {
   };
 }
 
+// server/scan/verification.ts
+import * as fs24 from "node:fs";
+import * as path23 from "node:path";
+function readPhaseChecks(recordDir) {
+  const dir = path23.join(recordDir, "verification");
+  let entries;
+  try {
+    entries = fs24.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  const checks = [];
+  for (const entry of entries) {
+    if (!entry.isFile())
+      continue;
+    const match = /^phase-check-(.+)\.md$/.exec(entry.name);
+    if (!match?.[1])
+      continue;
+    let updatedAt;
+    try {
+      updatedAt = fs24.statSync(path23.join(dir, entry.name)).mtime.toISOString();
+    } catch {
+      updatedAt = undefined;
+    }
+    checks.push({
+      phase: match[1],
+      rel: `verification/${entry.name}`,
+      ...updatedAt ? { updatedAt } : {}
+    });
+  }
+  checks.sort((a, b) => a.phase.localeCompare(b.phase));
+  return checks.length > 0 ? checks : undefined;
+}
+
 // server/model/freshness.ts
-import * as fs17 from "node:fs";
+import * as fs25 from "node:fs";
 var LAG_TOLERANCE_SEC = 300;
 function mtimeIso(p) {
   try {
-    return fs17.statSync(p).mtime.toISOString().replace(/\.\d{3}Z$/, "Z");
+    return fs25.statSync(p).mtime.toISOString().replace(/\.\d{3}Z$/, "Z");
   } catch {
     return;
   }
@@ -3457,7 +3985,7 @@ function buildProvenance(input) {
 function graphLastEvent(graphPath) {
   let raw;
   try {
-    raw = fs17.readFileSync(graphPath, "utf-8");
+    raw = fs25.readFileSync(graphPath, "utf-8");
   } catch {
     return;
   }
@@ -3542,10 +4070,10 @@ function isoNow() {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 function readRegistry(root, space, record) {
-  const p = path16.join(root, "aidlc", "spaces", space, "intents", "intents.json");
+  const p = path24.join(root, "aidlc", "spaces", space, "intents", "intents.json");
   let raw;
   try {
-    raw = fs18.readFileSync(p, "utf-8");
+    raw = fs26.readFileSync(p, "utf-8");
   } catch {
     return {};
   }
@@ -3626,9 +4154,9 @@ function assemble(root, harnessDir, usageCtx) {
     throw new NoRunError(resolved.kind, root);
   const now = isoNow();
   const warnings = [];
-  const statePath = path16.join(root, resolved.rel);
-  const recordDir = path16.dirname(statePath);
-  const graphPath = path16.join(recordDir, "runtime-graph.json");
+  const statePath = path24.join(root, resolved.rel);
+  const recordDir = path24.dirname(statePath);
+  const graphPath = path24.join(recordDir, "runtime-graph.json");
   const harnesses = harnessDirsWithCatalog(root);
   let measured;
   let discoveredHarness = harnessDir ?? harnesses[0];
@@ -3647,10 +4175,13 @@ function assemble(root, harnessDir, usageCtx) {
   if (!catalog) {
     warnings.push(harnessDir ? { code: "catalog-read-failed", harnessDir } : { code: "catalog-not-found" });
   }
+  if (catalog && catalog.disabled.length > 0) {
+    warnings.push({ code: "plugin-stages-disabled", count: catalog.disabled.length });
+  }
   const isStage = catalog ? (s) => catalog?.bySlug.has(s) : undefined;
   let stateText;
   try {
-    stateText = fs18.readFileSync(statePath, "utf-8");
+    stateText = fs26.readFileSync(statePath, "utf-8");
   } catch {
     throw new NoRunError("none", root);
   }
@@ -3663,6 +4194,23 @@ function assemble(root, harnessDir, usageCtx) {
   const diaries = readDiaries(recordDir);
   const health = readHealth(recordDir);
   const timing = buildTiming(ledger, now);
+  const runtime = readRuntimeGraph(recordDir);
+  const signals = readEngineSignals(recordDir);
+  if (runtime) {
+    const statusBySlug = {};
+    for (const phase of state.phases) {
+      for (const stage of phase.stages)
+        statusBySlug[stage.slug] = stage.status;
+    }
+    for (const span of runtime.stages) {
+      if (!span.completedAt)
+        continue;
+      const status = Object.hasOwn(statusBySlug, span.slug) ? statusBySlug[span.slug] : undefined;
+      if (status !== undefined && status !== "done") {
+        warnings.push({ code: "runtime-state-divergence", stage: span.slug });
+      }
+    }
+  }
   const stageStatuses = new Map;
   for (const p of state.phases) {
     for (const s of p.stages) {
@@ -3746,7 +4294,7 @@ function assemble(root, harnessDir, usageCtx) {
   let sensorDrift;
   const graphFired = (() => {
     try {
-      const doc = JSON.parse(fs18.readFileSync(graphPath, "utf-8"));
+      const doc = JSON.parse(fs26.readFileSync(graphPath, "utf-8"));
       if (!Array.isArray(doc?.stages))
         return;
       return doc.stages.reduce((n, s) => n + (Array.isArray(s.sensor_firings) ? s.sensor_firings.length : 0), 0);
@@ -3770,7 +4318,7 @@ function assemble(root, harnessDir, usageCtx) {
   });
   const relParts = resolved.rel.split("/");
   const space = relParts[2] ?? "default";
-  const record = relParts[4] ?? path16.basename(recordDir);
+  const record = relParts[4] ?? path24.basename(recordDir);
   const identity = {
     root,
     space,
@@ -3780,6 +4328,13 @@ function assemble(root, harnessDir, usageCtx) {
     harnessDir: catalog?.harnessDir,
     ...readRegistry(root, space, record)
   };
+  const intents = readIntentRegistry(path24.join(root, "aidlc", "spaces", space));
+  const spaces = listSpaces(root);
+  const phaseChecks = readPhaseChecks(recordDir);
+  const knowledge = readKnowledge(path24.join(root, "aidlc", "spaces", space));
+  const plan = readPlan(recordDir);
+  const reviews = readReviews(recordDir);
+  const plugins = catalog?.harnessDir ? readPluginInventory(root, catalog.harnessDir) : undefined;
   const window = usageCtx?.window ?? "30d";
   const mode = usageCtx?.mode ?? "auto";
   const usageKind = resolveUsageKind(mode, catalog?.harnessDir ?? discoveredHarness);
@@ -3831,6 +4386,15 @@ function assemble(root, harnessDir, usageCtx) {
     deferrals,
     health,
     timing,
+    ...runtime ? { runtime } : {},
+    ...signals ? { signals } : {},
+    ...intents ? { intents } : {},
+    ...spaces.length > 1 ? { spaces } : {},
+    ...phaseChecks ? { phaseChecks } : {},
+    ...knowledge ? { knowledge } : {},
+    ...plan ? { plan } : {},
+    ...reviews ? { reviews } : {},
+    ...plugins ? { plugins } : {},
     blockers: buildBlockers(questions, state.currentStage, now),
     gates: buildGates(ledger, state.revisionCount, timing.awaitingStage),
     rework: buildRework(ledger),
@@ -3871,7 +4435,7 @@ function json(res, status, body) {
 }
 function isWorkspace(root) {
   try {
-    return fs19.statSync(`${root}/aidlc`).isDirectory();
+    return fs27.statSync(`${root}/aidlc`).isDirectory();
   } catch {
     return false;
   }

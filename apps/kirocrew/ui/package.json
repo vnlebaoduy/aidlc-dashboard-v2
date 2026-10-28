@@ -1,0 +1,13 @@
+{
+  "name": "aidlc-ledger-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "lucide-react": "1.52.0"
+  }
+}
