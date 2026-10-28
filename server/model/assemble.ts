@@ -25,6 +25,7 @@ import { serverStrings } from "../i18n/messages";
 import { type StageArtifact, listStageArtifacts } from "../scan/artifacts";
 import { type AuditLedger, readAuditLedger } from "../scan/audit";
 import { readDeferrals } from "../scan/deferrals";
+import { readEngineSignals } from "../scan/engine-signals";
 import { type HarnessTurns, measureHarnessTurns } from "../scan/harness-usage";
 import { readHealth } from "../scan/hooks-health";
 import { type StateCompat, readUnitLifecycle, scanConstructionMatrix } from "../scan/matrix";
@@ -340,6 +341,7 @@ export function assemble(
   const health = readHealth(recordDir);
   const timing = buildTiming(ledger, now);
   const runtime = readRuntimeGraph(recordDir);
+  const signals = readEngineSignals(recordDir);
   if (runtime) {
     const statusBySlug: Record<string, string> = {};
     for (const phase of state.phases) {
@@ -667,6 +669,7 @@ export function assemble(
     health,
     timing,
     ...(runtime ? { runtime } : {}),
+    ...(signals ? { signals } : {}),
     blockers: buildBlockers(questions, state.currentStage, now),
     gates: buildGates(ledger, state.revisionCount, timing.awaitingStage),
     rework: buildRework(ledger),

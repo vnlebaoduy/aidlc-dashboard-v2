@@ -18,6 +18,7 @@ import type { TokenViewModel } from "../credit/claude/token-model";
 import type { CreditViewModel } from "../credit/view/credit-model";
 import type { StageArtifact } from "../scan/artifacts";
 import type { DeferralReport } from "../scan/deferrals";
+import type { EngineSignals } from "../scan/engine-signals";
 import type { HealthReport } from "../scan/hooks-health";
 import type { ConstructionMatrix } from "../scan/matrix";
 import type { DiaryReport } from "../scan/memory-diary";
@@ -263,6 +264,11 @@ export interface DashboardModel {
    * Absent on a fresh clone; the screen says so rather than implying no stages ran.
    */
   runtime?: RuntimeGraph;
+  /**
+   * Engine-only signals from `.aidlc-engine/` (guard refusal streaks, whose move is
+   * last). Absent when that gitignored plane is not on this clone.
+   */
+  signals?: EngineSignals;
   /** Audit event counts by type, for the stream filter. */
   eventCounts: [string, number][];
   /** Newest audit events, for the stream panel (bounded — see assemble.ts). */

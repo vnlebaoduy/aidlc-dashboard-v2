@@ -52,3 +52,12 @@ Cover the upstream planes the dashboard currently ignores: `.aidlc-engine/` deci
 - `.aidlc-engine` is gitignored: absent on fresh clones; the page must say "engine state not present" rather than "healthy".
 - Reviewer record schema is internal; parse only what the UI shows and keep unknown fields opaque.
 - Plugin composition could double-count stages; dedupe by slug with plugin provenance shown.
+
+## Progress
+
+- [x] `server/scan/engine-signals.ts`: guard-refusal streaks (`count`, `codes`, Unit, `pendingAsk`) and turn state from the `human-turn` / `engine-touch` markers; absent plane returns undefined, malformed records are skipped.
+- [x] The model exposes `signals`; tests cover streak ordering, the left-over ask, malformed records and both turn states.
+- [ ] Surface guard refusals and a stalled turn in the "needs you" queue (Phase 4 UI; needs a product decision on which tier).
+- [ ] Reviews: format is per-stage `<stage dir>/reviews/review-NN.md` plus digest-bound records in `.aidlc-engine/`; read the writer before parsing verdicts.
+- [ ] Plugins, spaces/intents registry, knowledge/documents + documentkb, codekb, phase checks, plan.json.
+
