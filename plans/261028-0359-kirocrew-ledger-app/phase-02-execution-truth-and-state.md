@@ -51,3 +51,13 @@ Make the dashboard read the two sources upstream declares authoritative — `run
 
 - Runtime-graph is gitignored and machine-local: absent on a fresh clone. Degrade to audit with an explicit warning, never invent spans.
 - 2.12 may add fields; parse defensively and ignore unknown keys.
+
+## Progress
+
+- [x] `server/scan/runtime-graph.ts` reads `workflow_id`, `started_at` and per-stage spans; malformed or absent files return undefined.
+- [x] `AidlcState` carries the Scope Configuration and Workspace State settings plus plan, worktree, bolt refs, construction execution, gate rhythm and verification command; absent stays undefined.
+- [x] The model exposes `runtime` and raises `runtime-state-divergence` when the graph marks a stage completed that state.md does not.
+- [x] Stages shows depth, test strategy, guard policy, sensors, plan approval and collaborators when the record carries them; Sources adds an Execution record row.
+- [x] Tests: runtime-graph parser, settings parsing, and an end-to-end divergence case over a copied fixture.
+- [ ] Timing still derives spans from the audit; runtime spans are shown, not substituted. Decide in Phase 3 whether to swap the source.
+
