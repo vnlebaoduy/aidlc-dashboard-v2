@@ -42,6 +42,6 @@
     "app:build": "bun build apps/kirocrew/backend/src/server.ts --target node --format esm --outfile apps/kirocrew/backend/dist/server.js && bun build apps/kirocrew/ui/src/index.js --target browser --format esm --outfile apps/kirocrew/ui/dist/index.mjs --external react --external react-dom/client --external lucide-react",
     "test": "bun test",
     "verify": "bun run typecheck && bun run lint && bun test && bun run build && bun run app:build && bun run app:test",
-    "app:test": "cd apps/kirocrew/ui && bun test"
+    "app:test": "cd apps/kirocrew/backend && bun test && cd ../ui && bun test"
   }
 }

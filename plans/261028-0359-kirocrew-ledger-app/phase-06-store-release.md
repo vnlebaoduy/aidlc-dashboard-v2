@@ -39,6 +39,12 @@ Publish `AI-DLC Ledger` to the Kiro Crew App Store with its own identity, assets
 - Review feedback is limited to copy or assets, not architecture.
 - Standalone and app releases are independent: a failing app build never blocks the dashboard release.
 
+## Progress
+
+- [x] `apps/kirocrew/assets/icon-512.png`: 512×512, RGB with no alpha channel (opaque), yellow aperture-and-ledger mark on ink; `icon.svg` kept as the source.
+- [x] `app.json` declares `iconPath`.
+- [ ] Screenshots, listing copy, registry entry, review.
+
 ## Risk Assessment
 
 - Review may reject a second AI-DLC app for overlap; the listing must state the difference (read-only analysis, evidence, no control plane).

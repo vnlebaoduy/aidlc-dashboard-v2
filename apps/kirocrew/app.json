@@ -5,9 +5,17 @@
   "description": "Read-only analysis of an AI-DLC v2 run: what needs you, how far along it is, where the evidence sits, and what the engine actually did.",
   "author": "Le Bao Duy",
   "license": "MIT",
+  "iconPath": "assets/icon-512.png",
   "minKiroCrewVersion": "0.3.0",
-  "tags": ["aidlc", "developer-tools", "observability", "workflows"],
-  "jobFamilies": ["software-engineering"],
+  "tags": [
+    "aidlc",
+    "developer-tools",
+    "observability",
+    "workflows"
+  ],
+  "jobFamilies": [
+    "software-engineering"
+  ],
   "highlights": [
     "Every gate, question, guard stop and stalled turn in one queue, with the evidence beside it",
     "Execution truth read from runtime-graph, not re-derived from the audit",
@@ -36,7 +44,9 @@
     }
   },
   "permissions": {
-    "api": ["/api/apps/aidlc-ledger"],
+    "api": [
+      "/api/apps/aidlc-ledger"
+    ],
     "events": [],
     "mcpTools": [],
     "storage": true,
@@ -46,7 +56,10 @@
     "memory": ""
   },
   "platform": {
-    "os": ["macos", "linux"],
+    "os": [
+      "macos",
+      "linux"
+    ],
     "installMode": "server",
     "requiresDesktopApp": false
   }
