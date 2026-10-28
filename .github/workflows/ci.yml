@@ -32,3 +32,11 @@ jobs:
 
       - name: Typecheck, lint, test and build
         run: bun run verify
+
+      - name: The app backend must run on plain Node
+        run: |
+          ! grep -q "bun:" apps/kirocrew/backend/dist/server.js
+          PORT=4399 AIDLC_LEDGER_ROOT=fixtures/reference node apps/kirocrew/backend/dist/server.js &
+          for _ in $(seq 1 20); do curl -sf http://127.0.0.1:4399/health >/dev/null && break; sleep 0.3; done
+          curl -sf http://127.0.0.1:4399/health
+          curl -sf http://127.0.0.1:4399/api/apps/aidlc-ledger/model | head -c 80

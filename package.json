@@ -29,10 +29,11 @@
     "dev:web": "cd web && bun run dev",
     "build": "cd web && bun run build",
     "start": "bun run server/server.ts",
-    "typecheck": "bunx tsc -p server --noEmit && cd web && bunx tsc -b",
-    "lint": "bunx --bun @biomejs/biome check server/ scripts/ web/src/",
-    "format": "bunx --bun @biomejs/biome format --write server/ scripts/ web/src/",
+    "typecheck": "bunx tsc -p server --noEmit && bunx tsc -p apps/kirocrew/backend --noEmit && cd web && bunx tsc -b",
+    "lint": "bunx --bun @biomejs/biome check server/ scripts/ web/src/ apps/kirocrew/backend/src apps/kirocrew/ui/src",
+    "format": "bunx --bun @biomejs/biome format --write server/ scripts/ web/src/ apps/kirocrew/backend/src apps/kirocrew/ui/src",
+    "app:build": "bun build apps/kirocrew/backend/src/server.ts --target node --format esm --outfile apps/kirocrew/backend/dist/server.js && bun build apps/kirocrew/ui/src/index.js --target browser --format esm --outfile apps/kirocrew/ui/dist/index.mjs --external react --external react-dom/client",
     "test": "bun test",
-    "verify": "bun run typecheck && bun run lint && bun test && bun run build"
+    "verify": "bun run typecheck && bun run lint && bun test && bun run build && bun run app:build"
   }
 }

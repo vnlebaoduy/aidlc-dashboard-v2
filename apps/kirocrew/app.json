@@ -1,0 +1,53 @@
+{
+  "name": "aidlc-ledger",
+  "version": "0.1.0",
+  "displayName": "AI-DLC Ledger",
+  "description": "Read-only analysis of an AI-DLC v2 run: what needs you, how far along it is, where the evidence sits, and what the engine actually did.",
+  "author": "Le Bao Duy",
+  "license": "MIT",
+  "minKiroCrewVersion": "0.3.0",
+  "tags": ["aidlc", "developer-tools", "observability", "workflows"],
+  "jobFamilies": ["software-engineering"],
+  "highlights": [
+    "Every gate, question, guard stop and stalled turn in one queue, with the evidence beside it",
+    "Execution truth read from runtime-graph, not re-derived from the audit",
+    "Stage inspector with artifacts, sensors, reviewer verdicts and revisions",
+    "Sources page that names every input the engine read, and every one it could not",
+    "Read-only: the workspace is never written to"
+  ],
+  "backend": {
+    "type": "node",
+    "entryPoint": "backend/dist/server.js",
+    "port": "auto",
+    "healthCheck": "/health",
+    "routes": "/api/apps/aidlc-ledger"
+  },
+  "ui": {
+    "entry": "dist/index.mjs",
+    "pages": [
+      {
+        "route": "/apps/aidlc-ledger",
+        "label": "AI-DLC Ledger"
+      }
+    ],
+    "sidebar": {
+      "section": "Apps",
+      "order": 10
+    }
+  },
+  "permissions": {
+    "api": ["/api/apps/aidlc-ledger"],
+    "events": [],
+    "mcpTools": [],
+    "storage": true,
+    "spawn": false,
+    "cron": false,
+    "network": false,
+    "memory": ""
+  },
+  "platform": {
+    "os": ["macos", "linux"],
+    "installMode": "server",
+    "requiresDesktopApp": false
+  }
+}

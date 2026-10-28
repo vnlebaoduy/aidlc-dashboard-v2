@@ -8,6 +8,8 @@
       "fixtures/**",
       "node_modules/**",
       "web/dist/**",
+      "apps/kirocrew/backend/dist/**",
+      "apps/kirocrew/ui/dist/**",
       "web/src/components/ui/**",
       "web/src/routeTree.gen.ts"
     ]
