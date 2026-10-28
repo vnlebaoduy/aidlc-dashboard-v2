@@ -1,11 +1,19 @@
+import { ViewLink } from "@/components/art-link";
 import { Empty, PageHeader, Section } from "@/components/page";
 import { IdentityCard } from "@/features/sources/identity-card";
 import { SourcesTable } from "@/features/sources/sources-table";
 import { useRun } from "@/hooks/use-run";
 import { useI18n } from "@/i18n";
 import { warningTextIn } from "@/i18n/warnings";
+import { shortTs } from "@/lib/format";
 import { createFileRoute } from "@tanstack/react-router";
-import { CircleCheckIcon, DatabaseIcon, TriangleAlertIcon } from "lucide-react";
+import {
+  CircleCheckIcon,
+  ClipboardCheckIcon,
+  DatabaseIcon,
+  LibraryIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 
 export const Route = createFileRoute("/_app/sources")({ component: Page });
 
@@ -46,7 +54,69 @@ function Page() {
         <SourcesTable m={m} />
       </Section>
 
-      <IdentityCard id={m.identity} runtime={m.runtime} />
+      {m.knowledge ? (
+        <Section title={c.sourcesPage.knowledge} icon={<LibraryIcon />}>
+          <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
+            <dt className="text-xs font-medium text-muted-foreground sm:pt-0.5">
+              {c.sourcesPage.knowledgeDocuments}
+            </dt>
+            <dd className="tabular">{m.knowledge.documentFiles}</dd>
+            <dt className="text-xs font-medium text-muted-foreground sm:pt-0.5">
+              {c.sourcesPage.knowledgeIndexed}
+            </dt>
+            <dd className="tabular">{m.knowledge.indexedDocuments ?? "—"}</dd>
+            <dt className="text-xs font-medium text-muted-foreground sm:pt-0.5">
+              {c.sourcesPage.knowledgeStates}
+            </dt>
+            <dd className="break-words">
+              {m.knowledge.states && m.knowledge.states.length > 0
+                ? m.knowledge.states.map((state) => `${state.state} ${state.count}`).join(" · ")
+                : "—"}
+            </dd>
+            <dt className="text-xs font-medium text-muted-foreground sm:pt-0.5">
+              {c.sourcesPage.knowledgeRules}
+            </dt>
+            <dd className="break-words">
+              {m.knowledge.memoryFiles.length > 0 ? m.knowledge.memoryFiles.join(", ") : "—"}
+              {m.knowledge.phaseRules > 0 ? ` · phases ${m.knowledge.phaseRules}` : ""}
+            </dd>
+            <dt className="text-xs font-medium text-muted-foreground sm:pt-0.5">
+              {c.sourcesPage.knowledgeCodekb}
+            </dt>
+            <dd className="break-words">
+              {m.knowledge.codekbRepos.length > 0 ? m.knowledge.codekbRepos.join(", ") : "—"}
+            </dd>
+          </dl>
+        </Section>
+      ) : null}
+
+      <Section title={c.sourcesPage.phaseChecks} icon={<ClipboardCheckIcon />}>
+        {m.phaseChecks && m.phaseChecks.length > 0 ? (
+          <ul className="space-y-2 text-sm">
+            {m.phaseChecks.map((check) => (
+              <li key={check.rel} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="font-medium">{check.phase}</span>
+                <ViewLink rel={check.rel} title={check.rel} className="inline">
+                  {check.rel.split("/").pop() ?? check.rel}
+                </ViewLink>
+                {check.updatedAt ? (
+                  <span className="text-xs text-muted-foreground">{shortTs(check.updatedAt)}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Empty className="py-4">{c.sourcesPage.phaseCheckEmpty}</Empty>
+        )}
+      </Section>
+
+      <IdentityCard
+        id={m.identity}
+        runtime={m.runtime}
+        plan={m.plan}
+        spaces={m.spaces}
+        intents={m.intents}
+      />
     </div>
   );
 }

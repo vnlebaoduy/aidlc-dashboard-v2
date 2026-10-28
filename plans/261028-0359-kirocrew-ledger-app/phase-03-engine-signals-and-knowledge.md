@@ -63,5 +63,6 @@ Cover the upstream planes the dashboard currently ignores: `.aidlc-engine/` deci
 - [x] `server/scan/verification.ts`: lists `verification/phase-check-<phase>.md` with a viewer-ready path and mtime; the model carries `phaseChecks`.
 - [x] `server/scan/knowledge.ts`: counts `knowledge/documents`, parses `documentkb/index.json` (extraction states, tombstones, linked rows), lists `codekb/<repo>` and the `memory/` rule files; broken catalog still reports what it can see.
 - [x] `server/scan/plan.ts`: reads `.aidlc-engine/plan.json` (`{slug, phase, action}`), dropping shapeless rows.
-- [ ] Plugins, reviews, and the UI that renders `signals`, `intents`, `phaseChecks`, `knowledge` and `plan`.
+- [x] Sources renders the new planes: Knowledge inputs (documents, index states, tombstones, codekb, rule files), Phase checks with viewer links, and identity rows for the resolved plan, spaces and the intent registry.
+- [ ] Plugins, reviews, and the "needs you" treatment for guard refusals / stalled turn (Phase 4 decision queue).
 

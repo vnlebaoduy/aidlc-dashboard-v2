@@ -98,6 +98,18 @@ export interface ChromeStrings {
     /** `stages` and `workflowId` are already read; `workflowId` may be "—". */
     runtimeMeta: (stages: number, workflowId: string) => string;
     runtimeMissing: string;
+    knowledge: string;
+    knowledgeDocuments: string;
+    knowledgeIndexed: string;
+    knowledgeStates: string;
+    knowledgeCodekb: string;
+    knowledgeRules: string;
+    phaseChecks: string;
+    phaseCheckEmpty: string;
+    plan: string;
+    planSummary: (execute: number, skip: number) => string;
+    spaces: string;
+    registry: string;
   };
   decisionsPage: {
     tabs: {
@@ -269,6 +281,18 @@ const EN: ChromeStrings = {
       `${stages} stages from runtime-graph · workflow ${workflowId}`,
     runtimeMissing:
       "runtime-graph.json is not present in this clone — stage spans come from the audit only",
+    knowledge: "Knowledge inputs",
+    knowledgeDocuments: "documents",
+    knowledgeIndexed: "indexed",
+    knowledgeStates: "catalog states",
+    knowledgeCodekb: "code knowledge",
+    knowledgeRules: "rule files",
+    phaseChecks: "Phase checks",
+    phaseCheckEmpty: "No phase has closed yet.",
+    plan: "resolved plan",
+    planSummary: (execute, skip) => `${execute} execute · ${skip} skip`,
+    spaces: "spaces",
+    registry: "intent registry",
   },
   decisionsPage: {
     tabs: {
@@ -447,6 +471,18 @@ const VI: ChromeStrings = {
       `${stages} stage từ runtime-graph · workflow ${workflowId}`,
     runtimeMissing:
       "Không có runtime-graph.json trong bản clone này — khoảng thời gian stage chỉ đến từ audit",
+    knowledge: "Đầu vào knowledge",
+    knowledgeDocuments: "tài liệu",
+    knowledgeIndexed: "đã index",
+    knowledgeStates: "trạng thái catalog",
+    knowledgeCodekb: "code knowledge",
+    knowledgeRules: "file rule",
+    phaseChecks: "Kiểm tra phase",
+    phaseCheckEmpty: "Chưa phase nào đóng.",
+    plan: "plan đã chốt",
+    planSummary: (execute, skip) => `${execute} thực thi · ${skip} bỏ`,
+    spaces: "space",
+    registry: "intent registry",
   },
   decisionsPage: {
     tabs: {
