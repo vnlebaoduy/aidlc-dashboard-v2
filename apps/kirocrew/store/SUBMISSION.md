@@ -19,6 +19,21 @@ manifest stay next to the code it reuses.
 - Registry row inserted into a local clone of `KiroCrewApps`:
   `python3 tools/validate.py` → `OK: catalog is valid`.
 
+## Federated install (verified)
+
+This repository doubles as a registry index (`app-registry.json` at the root):
+
+```json
+[{ "name": "aidlc-ledger", "gitUrl": "https://github.com/vnlebaoduy/aidlc-dashboard-v2",
+   "repo": "https://github.com/vnlebaoduy/aidlc-dashboard-v2", "branch": "main",
+   "subdirectory": "apps/kirocrew" }]
+```
+
+`PUT /api/apps/registries` + `POST /api/apps/registries/refresh` then
+`POST /api/apps/registry/install {"name":"aidlc-ledger"}` installed it from the
+published commit; the same-repo carve-out means the store reads art with the
+owner's credentials.
+
 ## Submit
 
 1. Fork `kirodotdev/KiroCrewApps`, append `registry-entry.json` to

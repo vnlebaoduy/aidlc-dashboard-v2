@@ -45,7 +45,8 @@ Publish `AI-DLC Ledger` to the Kiro Crew App Store with its own identity, assets
 - [x] `app.json` declares `iconPath`.
 - [x] Six screenshots (Overview, Stages, Sources × light/dark) captured at 1500×1000 from the built bundle, plus use cases and a configuration line in `app.json`.
 - [x] Install verified locally; `store/registry-entry.json` validates against a clone of `KiroCrewApps` (`tools/validate.py` → OK); submission steps in `store/SUBMISSION.md`.
-- [ ] External review by the `KiroCrewApps` curators (not performed here).
+- [x] Store path proved without curator review: the repo's `app-registry.json` is a federated registry, `KiroCrew` was configured with it, and `POST /api/apps/registry/install` cloned GitHub `main` (`subdirectory: apps/kirocrew`), installed v0.1.0 and served the page with zero console errors.
+- [ ] Official catalog listing: the maintainers author entries themselves (no self-serve PR). A listing request issue is the only route, and it is theirs to accept.
 
 ## Risk Assessment
 
