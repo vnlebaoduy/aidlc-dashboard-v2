@@ -61,5 +61,7 @@ Cover the upstream planes the dashboard currently ignores: `.aidlc-engine/` deci
 - [ ] Reviews: format is per-stage `<stage dir>/reviews/review-NN.md` plus digest-bound records in `.aidlc-engine/`; read the writer before parsing verdicts.
 - [x] `server/scan/intents.ts`: reads `intents.json` rows (BOM, comments and a trailing comma tolerated) and lists every space; the model carries `intents` and `spaces`.
 - [x] `server/scan/verification.ts`: lists `verification/phase-check-<phase>.md` with a viewer-ready path and mtime; the model carries `phaseChecks`.
-- [ ] Plugins, knowledge/documents + documentkb, codekb, plan.json, and the UI that renders `intents`/`phaseChecks`.
+- [x] `server/scan/knowledge.ts`: counts `knowledge/documents`, parses `documentkb/index.json` (extraction states, tombstones, linked rows), lists `codekb/<repo>` and the `memory/` rule files; broken catalog still reports what it can see.
+- [x] `server/scan/plan.ts`: reads `.aidlc-engine/plan.json` (`{slug, phase, action}`), dropping shapeless rows.
+- [ ] Plugins, reviews, and the UI that renders `signals`, `intents`, `phaseChecks`, `knowledge` and `plan`.
 

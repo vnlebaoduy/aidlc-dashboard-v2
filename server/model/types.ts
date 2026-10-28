@@ -21,10 +21,12 @@ import type { DeferralReport } from "../scan/deferrals";
 import type { EngineSignals } from "../scan/engine-signals";
 import type { HealthReport } from "../scan/hooks-health";
 import type { IntentRow } from "../scan/intents";
+import type { KnowledgeSummary } from "../scan/knowledge";
 import type { ConstructionMatrix } from "../scan/matrix";
 import type { DiaryReport } from "../scan/memory-diary";
 import type { OutcomesFile } from "../scan/outcomes";
 import type { AidlcState } from "../scan/parser";
+import type { PlannedStage } from "../scan/plan";
 import type { AskKind, QuestionsReport } from "../scan/questions";
 import type { ReworkReport } from "../scan/rework";
 import type { RuntimeGraph } from "../scan/runtime-graph";
@@ -277,6 +279,10 @@ export interface DashboardModel {
   spaces?: string[];
   /** Phase boundary checks that have been written, with their mtimes. */
   phaseChecks?: PhaseCheck[];
+  /** Space-level rules, documents and code knowledge, summarised. */
+  knowledge?: KnowledgeSummary;
+  /** The engine's resolved plan for this intent, when the derived file is present. */
+  plan?: PlannedStage[];
   /** Audit event counts by type, for the stream filter. */
   eventCounts: [string, number][];
   /** Newest audit events, for the stream panel (bounded — see assemble.ts). */

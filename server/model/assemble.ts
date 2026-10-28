@@ -29,10 +29,12 @@ import { readEngineSignals } from "../scan/engine-signals";
 import { type HarnessTurns, measureHarnessTurns } from "../scan/harness-usage";
 import { readHealth } from "../scan/hooks-health";
 import { listSpaces, readIntentRegistry } from "../scan/intents";
+import { readKnowledge } from "../scan/knowledge";
 import { type StateCompat, readUnitLifecycle, scanConstructionMatrix } from "../scan/matrix";
 import { readDiaries } from "../scan/memory-diary";
 import { readOutcomes } from "../scan/outcomes";
 import { type StageStatus, parseState } from "../scan/parser";
+import { readPlan } from "../scan/plan";
 import { readQuestions } from "../scan/questions";
 import { resolveState } from "../scan/resolve";
 import { buildRework } from "../scan/rework";
@@ -600,6 +602,8 @@ export function assemble(
   const intents = readIntentRegistry(path.join(root, "aidlc", "spaces", space));
   const spaces = listSpaces(root);
   const phaseChecks = readPhaseChecks(recordDir);
+  const knowledge = readKnowledge(path.join(root, "aidlc", "spaces", space));
+  const plan = readPlan(recordDir);
 
   // Usage slot. Which provider runs is resolved here, then that provider's
   // assembly is isolated: both read outside the workspace (SQLite handle / home
@@ -681,6 +685,8 @@ export function assemble(
     ...(intents ? { intents } : {}),
     ...(spaces.length > 1 ? { spaces } : {}),
     ...(phaseChecks ? { phaseChecks } : {}),
+    ...(knowledge ? { knowledge } : {}),
+    ...(plan ? { plan } : {}),
     blockers: buildBlockers(questions, state.currentStage, now),
     gates: buildGates(ledger, state.revisionCount, timing.awaitingStage),
     rework: buildRework(ledger),
