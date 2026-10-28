@@ -64,13 +64,15 @@
     "requiresDesktopApp": false
   },
   "screenshots": [
+    "assets/screenshots/fleet-light.png",
     "assets/screenshots/overview-light.png",
-    "assets/screenshots/stages-light.png",
+    "assets/screenshots/queue-light.png",
     "assets/screenshots/sources-light.png"
   ],
   "screenshotsDark": [
+    "assets/screenshots/fleet-dark.png",
     "assets/screenshots/overview-dark.png",
-    "assets/screenshots/stages-dark.png",
+    "assets/screenshots/queue-dark.png",
     "assets/screenshots/sources-dark.png"
   ],
   "useCases": [
