@@ -60,7 +60,7 @@ describe("AI-DLC Ledger pages", () => {
 
   test("the default export is the page component the host renders", () => {
     const html = renderToStaticMarkup(createElement(LedgerPage));
-    expect(html).toContain("Reading the run");
+    expect(html).toContain("Reading projects");
   });
 
   test("a model without optional planes still renders every tab", () => {

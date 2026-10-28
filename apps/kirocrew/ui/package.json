@@ -1,5 +1,5 @@
 {
-  "name": "aidlc-ledger-ui",
+  "name": "aidlc-management-tool-ui",
   "private": true,
   "type": "module",
   "scripts": {

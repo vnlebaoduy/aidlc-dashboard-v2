@@ -9,10 +9,10 @@ manifest stay next to the code it reuses.
 
 ## Verified locally
 
-- `kirocrew app install apps/kirocrew` → `✅ installed aidlc-ledger v0.1.0`, enabled,
+- `kirocrew app install apps/kirocrew` → `✅ installed aidlc-management-tool v0.1.0`, enabled,
   backend healthy over loopback, `minKiroCrewVersion` 0.3.0 satisfied by 0.10.0.
 - In the running gateway (0.10.0): page renders in the host shell, five tabs switch,
-  light and dark both readable with host theme variables, `/apps/aidlc-ledger/api/*`
+  light and dark both readable with host theme variables, `/apps/aidlc-management-tool/api/*`
   answers 200, and evidence opens inline.
 - Backend route tests: decision text/lifecycle (11), gateway adapter (6). UI render
   tests: 8. Repository gate: `bun run verify`.
@@ -24,13 +24,13 @@ manifest stay next to the code it reuses.
 This repository doubles as a registry index (`app-registry.json` at the root):
 
 ```json
-[{ "name": "aidlc-ledger", "gitUrl": "https://github.com/vnlebaoduy/aidlc-dashboard-v2",
+[{ "name": "aidlc-management-tool", "gitUrl": "https://github.com/vnlebaoduy/aidlc-dashboard-v2",
    "repo": "https://github.com/vnlebaoduy/aidlc-dashboard-v2", "branch": "main",
    "subdirectory": "apps/kirocrew" }]
 ```
 
 `PUT /api/apps/registries` + `POST /api/apps/registries/refresh` then
-`POST /api/apps/registry/install {"name":"aidlc-ledger"}` installed it from the
+`POST /api/apps/registry/install {"name":"aidlc-management-tool"}` installed it from the
 published commit; the same-repo carve-out means the store reads art with the
 owner's credentials.
 

@@ -1,4 +1,4 @@
-// AI-DLC Ledger, Kiro Crew page entry.
+// AI-DLC Management Tool, Kiro Crew page entry.
 //
 // The host mounts this module through its import map and provides React and
 // lucide-react, so the bundle keeps both external. No router, no shell, no theme:
@@ -30,7 +30,7 @@ import { createElement as h, useEffect, useState } from "react";
 
 // App backends are reached through the gateway's app proxy, not the API path:
 // `/apps/<name>/api/<backend path>` (verified against a running gateway).
-const BASE = "/apps/aidlc-ledger/api/apps/aidlc-ledger";
+const BASE = "/apps/aidlc-management-tool/api/apps/aidlc-management-tool";
 
 // Host theme variables (measured on the running gateway): --bg, --card,
 // --border, --muted, --text, --accent. Everything else is this app's own palette,
@@ -214,6 +214,7 @@ function Overview({ m }) {
 
 function Stages({ m }) {
   const runtime = m.runtime?.stages ?? [];
+  const [open, setOpen] = useState(null);
   return h(
     "div",
     { style: { display: "grid", gap: 16 } },
@@ -232,31 +233,99 @@ function Stages({ m }) {
                   ? `construction/${stage.bolt}/${stage.slug}`
                   : `${phase.key}/${stage.slug}`;
                 const files = m.artifacts?.[key] ?? [];
+                const id = `${phase.key}:${stage.bolt ?? ""}:${stage.slug}`;
+                const reviews = (m.reviews ?? []).filter(
+                  (r) =>
+                    r.stage === stage.slug && (r.unit ?? undefined) === (stage.bolt ?? undefined),
+                );
+                const sensorFailures = (m.sensors?.failures ?? []).filter(
+                  (f) => f.stage === stage.slug,
+                );
                 return h(
                   "li",
-                  {
-                    key: `${stage.bolt ?? ""}:${stage.slug}`,
-                    style: {
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: 8,
-                      alignItems: "baseline",
-                      borderTop: `1px solid ${T.border}`,
-                      paddingTop: 8,
-                    },
-                  },
+                  { key: id, style: { borderTop: `1px solid ${T.border}`, paddingTop: 8 } },
                   h(
-                    "span",
-                    { style: { fontWeight: 600, fontSize: 13 } },
-                    stage.display || stage.slug,
+                    "button",
+                    {
+                      type: "button",
+                      onClick: () => setOpen(open === id ? null : id),
+                      "aria-expanded": open === id,
+                      style: {
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        alignItems: "baseline",
+                        width: "100%",
+                        border: "none",
+                        background: "none",
+                        padding: 0,
+                        color: T.fg,
+                        font: "inherit",
+                        textAlign: "left",
+                        cursor: "pointer",
+                      },
+                    },
+                    h(
+                      "span",
+                      { style: { fontWeight: 600, fontSize: 13 } },
+                      stage.display || stage.slug,
+                    ),
+                    h(Status, { status: stage.status }),
+                    h("span", { style: { color: T.muted, fontSize: 12 } }, `${files.length} files`),
+                    reviews.length > 0
+                      ? h(
+                          "span",
+                          { style: { color: T.muted, fontSize: 12 } },
+                          `${reviews.length} reviews`,
+                        )
+                      : null,
+                    runtimeStage?.elapsedSec !== undefined
+                      ? h(
+                          "span",
+                          { style: { color: T.fg, fontSize: 12 } },
+                          `engine ${seconds(runtimeStage.elapsedSec)}`,
+                        )
+                      : null,
                   ),
-                  h(Status, { status: stage.status }),
-                  h("span", { style: { color: T.muted, fontSize: 12 } }, `${files.length} files`),
-                  runtimeStage?.elapsedSec !== undefined
+                  open === id
                     ? h(
-                        "span",
-                        { style: { color: T.fg, fontSize: 12 } },
-                        `engine ${seconds(runtimeStage.elapsedSec)}`,
+                        "div",
+                        {
+                          style: {
+                            marginTop: 8,
+                            paddingLeft: 12,
+                            borderLeft: `2px solid ${T.border}`,
+                            display: "grid",
+                            gap: 6,
+                            fontSize: 12,
+                            color: T.fg,
+                          },
+                        },
+                        h(
+                          "div",
+                          null,
+                          h("span", { style: { fontWeight: 600 } }, "artifacts"),
+                          ` ${files.length}`,
+                          files.length > 0
+                            ? `: ${files.map((f) => f.rel.split("/").pop()).join(", ")}`
+                            : "",
+                        ),
+                        reviews.length > 0
+                          ? h(
+                              "div",
+                              null,
+                              h("span", { style: { fontWeight: 600 } }, "reviews"),
+                              ` ${reviews.map((r) => `#${r.number} ${r.verdict ?? "—"}${r.findings ? ` (${r.findings})` : ""}`).join(", ")}`,
+                            )
+                          : h("div", { style: { color: T.muted } }, "no reviewer pass recorded"),
+                        sensorFailures.length > 0
+                          ? h(
+                              "div",
+                              { style: { color: T.warning } },
+                              h("span", { style: { fontWeight: 600 } }, "sensor failures"),
+                              ` ${sensorFailures.length}`,
+                            )
+                          : h("div", { style: { color: T.muted } }, "no sensor failure recorded"),
                       )
                     : null,
                 );
@@ -708,8 +777,6 @@ export function App({ model, tab = "overview", onTab = () => {} }) {
   return h(
     "div",
     {
-      // Stable hook for store screenshots and for tests that need the app surface.
-      "data-ledger-root": "",
       style: {
         display: "grid",
         gap: 16,
@@ -752,7 +819,7 @@ export function App({ model, tab = "overview", onTab = () => {} }) {
 }
 
 /** First-run path: name the workspace the app should read (read-only afterwards). */
-function WorkspacePicker() {
+function WorkspacePicker({ onAdded = () => window.location.reload() }) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -760,14 +827,14 @@ function WorkspacePicker() {
     event.preventDefault();
     setBusy(true);
     setError(null);
-    fetch(`${BASE}/workspace`, {
+    fetch(`${BASE}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ root: value }),
     })
       .then(async (res) => {
         if (res.ok) {
-          window.location.reload();
+          onAdded();
           return;
         }
         const body = await res.json().catch(() => null);
@@ -844,11 +911,53 @@ function WorkspacePicker() {
 // example): no manual root, no manual mount. Hooks live here, while `App` stays a
 // pure tree so it can be server-rendered in tests.
 export default function LedgerPage() {
-  const [state, setState] = useState({ status: "loading" });
+  const [projects, setProjects] = useState(null);
+  const [selected, setSelected] = useState(() =>
+    typeof localStorage === "undefined" ? "" : (localStorage.getItem("ledger-project") ?? ""),
+  );
+  const [mode, setMode] = useState("project");
   const [tab, setTab] = useState("overview");
+  const [state, setState] = useState({ status: "loading" });
+
+  function loadProjects() {
+    return fetch(`${BASE}/projects`, { cache: "no-store" })
+      .then(async (res) => (res.ok ? ((await res.json()).projects ?? []) : []))
+      .catch(() => [])
+      .then((rows) => {
+        setProjects(rows);
+        return rows;
+      });
+  }
+
   useEffect(() => {
     let live = true;
-    fetch(`${BASE}/model`, { cache: "no-store", headers: { accept: "application/json" } })
+    fetch(`${BASE}/projects`, { cache: "no-store" })
+      .then(async (res) => (res.ok ? ((await res.json()).projects ?? []) : []))
+      .catch(() => [])
+      .then((rows) => {
+        if (!live) return;
+        setProjects(rows);
+        if (rows.length === 0) {
+          setState({ status: "empty" });
+          return;
+        }
+        const stored = localStorage.getItem("ledger-project") ?? "";
+        setSelected(rows.some((p) => p.root === stored) ? stored : rows[0].root);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selected) return;
+    localStorage.setItem("ledger-project", selected);
+    let live = true;
+    setState((prev) => ({ ...prev, status: prev.model ? prev.status : "loading" }));
+    fetch(`${BASE}/model?project=${encodeURIComponent(selected)}`, {
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    })
       .then(async (res) => {
         const body = await res.json();
         if (!live) return;
@@ -862,18 +971,124 @@ export default function LedgerPage() {
     return () => {
       live = false;
     };
-  }, []);
-  if (state.status === "loading") return h(Muted, null, "Reading the run…");
+  }, [selected]);
+
+  function openProject(root) {
+    setSelected(root);
+    setMode("project");
+    setTab("overview");
+  }
+
+  if (projects === null) return h(Muted, null, "Reading projects…");
+  if (projects.length === 0) return h(WorkspacePicker, { onAdded: loadProjects });
+
+  const current = projects.find((p) => p.root === selected) ?? projects[0];
+  const nav = h(
+    "div",
+    { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 4 } },
+    h(
+      "select",
+      {
+        value: selected,
+        onChange: (event) => openProject(event.target.value),
+        "aria-label": "Project",
+        style: {
+          padding: "6px 8px",
+          borderRadius: 4,
+          border: `1px solid ${T.border}`,
+          background: T.card,
+          color: T.fg,
+          font: "inherit",
+        },
+      },
+      projects.map((project) =>
+        h("option", { key: project.root, value: project.root }, project.name),
+      ),
+    ),
+    h(
+      "button",
+      {
+        type: "button",
+        onClick: () => setMode("fleet"),
+        "aria-pressed": mode === "fleet",
+        style: chip(mode === "fleet"),
+      },
+      `Projects (${projects.length})`,
+    ),
+    h(
+      "button",
+      {
+        type: "button",
+        onClick: () => setMode("queue"),
+        "aria-pressed": mode === "queue",
+        style: chip(mode === "queue"),
+      },
+      "Queue",
+    ),
+    mode !== "project"
+      ? h(
+          "button",
+          { type: "button", onClick: () => setMode("project"), style: chip(false) },
+          "Back to the run",
+        )
+      : null,
+  );
+
+  if (mode === "fleet")
+    return h(
+      "div",
+      { "data-ledger-root": "", style: shellStyle() },
+      nav,
+      h(Fleet, { onOpen: openProject }),
+    );
+  if (mode === "queue")
+    return h(
+      "div",
+      { "data-ledger-root": "", style: shellStyle() },
+      nav,
+      h(Queue, { onOpen: openProject }),
+    );
+
   if (state.status === "unreachable") return h(Muted, null, "The Ledger backend did not answer.");
   if (state.status === "refused")
-    return state.code === "no-workspace"
-      ? h(WorkspacePicker)
-      : h(
-          Muted,
-          null,
-          state.code === "not-a-workspace"
-            ? "That path is not an AI-DLC v2 workspace."
-            : "The run could not be read.",
-        );
-  return h(App, { model: state.model, tab, onTab: setTab });
+    return h(
+      Muted,
+      null,
+      state.code === "not-a-workspace"
+        ? `${current.name} is no longer an AI-DLC v2 workspace.`
+        : state.code === "no-project"
+          ? "That project is not registered any more."
+          : "The run could not be read.",
+    );
+  if (state.status === "loading") return h(Muted, null, "Reading the run…");
+  return h(
+    "div",
+    { "data-ledger-root": "", style: shellStyle() },
+    nav,
+    h(App, { model: state.model, tab, onTab: setTab }),
+  );
+}
+
+function shellStyle() {
+  return {
+    display: "grid",
+    gap: 12,
+    color: T.fg,
+    fontFamily: "inherit",
+    padding: "52px 8px 16px",
+    maxWidth: 1100,
+  };
+}
+
+function chip(active) {
+  return {
+    border: `1px solid ${active ? T.primary : T.border}`,
+    background: active ? T.primary : "transparent",
+    color: active ? T.primaryFg : T.fg,
+    borderRadius: 999,
+    padding: "4px 12px",
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+  };
 }

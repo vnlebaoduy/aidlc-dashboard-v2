@@ -1,10 +1,10 @@
-# AI-DLC Ledger (Kiro Crew app)
+# AI-DLC Management Tool (Kiro Crew app)
 
 Read-only analysis of an AI-DLC v2 run, as a native Kiro Crew app.
 
 - Backend: `backend/dist/server.js`, plain Node, bundled from `backend/src/server.ts`
   with the shared `server/scan` + `server/model` layer. The Gateway sets `PORT`,
-  probes `/health`, and proxies `/apps/aidlc-ledger/api/*` to it.
+  probes `/health`, and proxies `/apps/aidlc-management-tool/api/*` to it.
 - UI: `dist/index.mjs`, a page component the host renders (default export). React
   and lucide come from the host import map, so the bundle keeps them external.
 - No Usage panel: the app never imports `server/credit` and drops the usage slot
@@ -14,11 +14,11 @@ Read-only analysis of an AI-DLC v2 run, as a native Kiro Crew app.
 
 ```bash
 kirocrew app install <repo>/apps/kirocrew
-kirocrew config set agent.apps_trusted '["aidlc-ledger"]'
-kirocrew app enable aidlc-ledger
+kirocrew config set agent.apps_trusted '["aidlc-management-tool"]'
+kirocrew app enable aidlc-management-tool
 ```
 
-Then open **Apps → AI-DLC Ledger** and name a workspace once. The path is stored in
+Then open **Apps → AI-DLC Management Tool** and name a workspace once. The path is stored in
 `<app>/data/workspace.json` (the app's own data dir, outside every workspace) and
 can be changed later by clearing it.
 

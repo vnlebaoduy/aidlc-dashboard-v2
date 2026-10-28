@@ -1,7 +1,7 @@
 // apps/kirocrew/backend/src/server.ts
-import * as fs29 from "node:fs";
+import * as fs30 from "node:fs";
 import { createServer } from "node:http";
-import * as path26 from "node:path";
+import * as path27 from "node:path";
 
 // server/model/assemble.ts
 import * as fs26 from "node:fs";
@@ -4411,8 +4411,46 @@ function assemble(root, harnessDir, usageCtx) {
   };
 }
 
-// server/scan/view-file.ts
+// server/scan/summary.ts
 import * as fs27 from "node:fs";
+import * as path25 from "node:path";
+function readWorkspaceSummary(root) {
+  const resolved = resolveState(root);
+  if (resolved.kind !== "ok")
+    return { kind: "no-run", reason: resolved.kind };
+  const statePath = path25.join(root, resolved.rel);
+  const recordDir = path25.dirname(statePath);
+  let state;
+  try {
+    const catalog = readStageCatalog(root);
+    state = parseState(fs27.readFileSync(statePath, "utf-8"), catalog ? (slug) => catalog.bySlug.get(slug)?.name : undefined);
+  } catch {
+    return { kind: "unreadable" };
+  }
+  const questions = readQuestions(recordDir);
+  return {
+    kind: "ok",
+    record: path25.basename(recordDir),
+    progress: {
+      pct: state.overallPct,
+      done: state.overallDone,
+      total: state.overallTotal,
+      lifecyclePhase: state.lifecyclePhase,
+      currentStage: state.currentStage,
+      currentStageDisplay: state.currentStageDisplay,
+      asOf: state.lastUpdated || undefined,
+      source: "state.md"
+    },
+    blockers: {
+      count: questions.totalUnanswered,
+      asked: questions.totalQuestions,
+      source: "disk"
+    }
+  };
+}
+
+// server/scan/view-file.ts
+import * as fs28 from "node:fs";
 var MAX_VIEW_BYTES = 512 * 1024;
 function readArtifactSource(recordDir, rel) {
   const jailed = resolveArtifact(recordDir, rel);
@@ -4420,10 +4458,10 @@ function readArtifactSource(recordDir, rel) {
     return jailed;
   let fd;
   try {
-    const sizeBytes = fs27.statSync(jailed.real).size;
-    fd = fs27.openSync(jailed.real, "r");
+    const sizeBytes = fs28.statSync(jailed.real).size;
+    fd = fs28.openSync(jailed.real, "r");
     const buf = Buffer.allocUnsafe(MAX_VIEW_BYTES);
-    const read = fs27.readSync(fd, buf, 0, MAX_VIEW_BYTES, 0);
+    const read = fs28.readSync(fd, buf, 0, MAX_VIEW_BYTES, 0);
     const truncated = sizeBytes > read;
     let text = buf.subarray(0, read).toString("utf-8");
     if (truncated) {
@@ -4442,154 +4480,9 @@ function readArtifactSource(recordDir, rel) {
   } finally {
     if (fd !== undefined) {
       try {
-        fs27.closeSync(fd);
+        fs28.closeSync(fd);
       } catch {}
     }
-  }
-}
-
-// apps/kirocrew/backend/src/chat.ts
-import * as fs28 from "node:fs";
-import * as path25 from "node:path";
-function base() {
-  const explicit = process.env.AIDLC_LEDGER_CHAT_BASE?.trim();
-  if (explicit)
-    return explicit;
-  const origin = process.env.KIROCREW_GATEWAY_ORIGIN?.trim();
-  return origin && origin.length > 0 ? origin : undefined;
-}
-var cachedToken;
-function appSecret() {
-  const home = process.env.KIROCREW_HOME?.trim();
-  const name = process.env.KIROCREW_APP_NAME?.trim() || "aidlc-ledger";
-  if (!home)
-    return;
-  try {
-    const secret = fs28.readFileSync(path25.join(home, "apps", name, ".app_secret"), "utf-8").trim();
-    return secret.length > 0 ? secret : undefined;
-  } catch {
-    return;
-  }
-}
-async function tokenFor(origin) {
-  if (cachedToken?.origin === origin)
-    return cachedToken.token;
-  const secret = appSecret();
-  if (!secret)
-    return;
-  const name = process.env.KIROCREW_APP_NAME?.trim() || "aidlc-ledger";
-  try {
-    const res = await fetch(`${origin}/api/apps/${encodeURIComponent(name)}/token`, {
-      method: "POST",
-      headers: { "x-app-secret": secret, "content-type": "application/json" }
-    });
-    if (!res.ok)
-      return;
-    const body = await res.json();
-    const token = typeof body === "object" && body !== null && "token" in body && typeof body.token === "string" ? body.token : undefined;
-    if (!token)
-      return;
-    cachedToken = { origin, token };
-    return token;
-  } catch {
-    return;
-  }
-}
-function cookieFor(origin, token) {
-  try {
-    const port = new URL(origin).port || "80";
-    return `mc_token_${port}=${token}`;
-  } catch {
-    return `mc_token_5476=${token}`;
-  }
-}
-async function authHeaders(origin) {
-  const token = await tokenFor(origin);
-  return token ? { cookie: cookieFor(origin, token) } : undefined;
-}
-function slotOf(value) {
-  if (typeof value !== "object" || value === null)
-    return;
-  const key = "key" in value && typeof value.key === "string" ? value.key : undefined;
-  if (!key)
-    return;
-  const text = (name) => {
-    if (!(name in value))
-      return;
-    const field = Reflect.get(value, name);
-    return typeof field === "string" && field.length > 0 ? field : undefined;
-  };
-  const title = text("title");
-  const project = text("project");
-  const agent = text("agent");
-  return {
-    key,
-    ...title ? { title } : {},
-    ...project ? { project } : {},
-    ...agent ? { agent } : {}
-  };
-}
-async function listSlots() {
-  const origin = base();
-  if (!origin)
-    return;
-  try {
-    const auth = await authHeaders(origin);
-    if (!auth)
-      return;
-    const res = await fetch(`${origin}/api/chat/slots`, {
-      headers: { accept: "application/json", ...auth }
-    });
-    if (!res.ok)
-      return;
-    const body = await res.json();
-    const rows = Array.isArray(body) ? body : typeof body === "object" && body !== null && ("slots" in body) && Array.isArray(body.slots) ? body.slots : undefined;
-    if (!rows)
-      return;
-    return rows.map(slotOf).filter((slot) => slot !== undefined);
-  } catch {
-    return;
-  }
-}
-function slotForWorkspace(slots, root) {
-  const normalise = (value) => value.replace(/\/+$/, "");
-  const wanted = normalise(root);
-  const exact = slots.find((slot) => slot.project !== undefined && normalise(slot.project) === wanted);
-  if (exact)
-    return exact;
-  return slots.find((slot) => slot.project !== undefined && normalise(slot.project).startsWith(`${wanted}/`));
-}
-async function sendChat(input) {
-  const origin = base();
-  if (!origin)
-    return { ok: false, detail: "no-gateway" };
-  try {
-    const auth = await authHeaders(origin);
-    if (!auth)
-      return { ok: false, detail: "no-app-token" };
-    const res = await fetch(`${origin}/api/chat`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        accept: "text/event-stream, application/json",
-        ...auth
-      },
-      body: JSON.stringify({
-        message: input.message,
-        slot: input.slot,
-        meta: { sendId: input.sendId }
-      })
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      return { ok: false, status: res.status, detail: text.slice(0, 300) || "refused" };
-    }
-    await res.body?.cancel().catch(() => {
-      return;
-    });
-    return { ok: true, status: res.status, slot: input.slot };
-  } catch (err) {
-    return { ok: false, detail: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -4615,45 +4508,181 @@ function validateDraft(draft) {
     problems.push("answer-too-long");
   return problems;
 }
-function beginSend(existing, next) {
-  if (existing && existing.sendId === next.sendId) {
-    return { send: false, record: existing };
+
+// apps/kirocrew/backend/src/projects.ts
+import * as fs29 from "node:fs";
+import * as path26 from "node:path";
+function cleanRoot(root) {
+  return path26.resolve(root.trim());
+}
+function entryOf(root) {
+  const clean = cleanRoot(root);
+  return { root: clean, name: path26.basename(clean) || clean };
+}
+function readProjects(dataDir) {
+  const file = path26.join(dataDir, "projects.json");
+  try {
+    const doc = JSON.parse(fs29.readFileSync(file, "utf-8"));
+    if (Array.isArray(doc)) {
+      const rows = doc.map((row) => {
+        if (typeof row !== "object" || row === null || !("root" in row))
+          return;
+        return typeof row.root === "string" && row.root.trim().length > 0 ? entryOf(row.root) : undefined;
+      }).filter((row) => row !== undefined);
+      if (rows.length > 0)
+        return dedupe(rows);
+    }
+  } catch {}
+  try {
+    const legacy = JSON.parse(fs29.readFileSync(path26.join(dataDir, "workspace.json"), "utf-8"));
+    if (typeof legacy === "object" && legacy !== null && "root" in legacy) {
+      return typeof legacy.root === "string" && legacy.root.trim().length > 0 ? [entryOf(legacy.root)] : [];
+    }
+  } catch {}
+  return [];
+}
+function writeProjects(dataDir, projects) {
+  fs29.mkdirSync(dataDir, { recursive: true });
+  const file = path26.join(dataDir, "projects.json");
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs29.writeFileSync(tmp, `${JSON.stringify(dedupe(projects), null, 2)}
+`);
+  fs29.renameSync(tmp, file);
+}
+function dedupe(projects) {
+  const seen = new Set;
+  const out = [];
+  for (const project of projects) {
+    if (seen.has(project.root))
+      continue;
+    seen.add(project.root);
+    out.push(project);
   }
-  return { send: true, record: { ...next, status: "pending" } };
+  return out;
 }
-function markDelivered(record) {
-  if (record.status !== "pending")
-    return record;
-  return { ...record, status: "delivered" };
+function addProject(dataDir, root) {
+  const next = [entryOf(root), ...readProjects(dataDir).filter((p) => p.root !== cleanRoot(root))];
+  const projects = next.slice(0, 20);
+  writeProjects(dataDir, projects);
+  return projects;
 }
-function markUncertain(record, reason) {
-  if (record.status === "resolved" || record.status === "refused")
-    return record;
-  return { ...record, status: "uncertain", detail: reason };
-}
-function markRefused(record, code) {
-  if (record.status === "resolved")
-    return record;
-  return { ...record, status: "refused", detail: code };
+function removeProject(dataDir, root) {
+  const projects = readProjects(dataDir).filter((p) => p.root !== cleanRoot(root));
+  writeProjects(dataDir, projects);
+  return projects;
 }
 
 // apps/kirocrew/backend/src/server.ts
-var BASE = "/api/apps/aidlc-ledger";
+var BASE = "/api/apps/aidlc-management-tool";
 var PORT = Number(process.env.PORT ?? 0);
-var HERE = path26.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
-var APP_ROOT = path26.join(HERE, "..", "..");
-var WORKSPACE_FILE = path26.join(APP_ROOT, "data", "workspace.json");
-function storedRoot() {
-  try {
-    const doc = JSON.parse(fs29.readFileSync(WORKSPACE_FILE, "utf-8"));
-    if (typeof doc !== "object" || doc === null || !("root" in doc))
-      return;
-    return typeof doc.root === "string" && doc.root.trim().length > 0 ? doc.root.trim() : undefined;
-  } catch {
-    return;
+var HERE = path27.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+var DATA_DIR = path27.join(HERE, "..", "..", "data");
+var ENV_ROOT = process.env.AIDLC_LEDGER_ROOT?.trim();
+
+class Refusal extends Error {
+  code;
+  status;
+  constructor(code, status) {
+    super(code);
+    this.code = code;
+    this.status = status;
   }
 }
-var sends = new Map;
+function json(res, status, body) {
+  const payload = JSON.stringify(body);
+  res.writeHead(status, {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
+    "content-length": Buffer.byteLength(payload)
+  });
+  res.end(payload);
+}
+function isWorkspace(root) {
+  try {
+    return fs30.statSync(path27.join(root, "aidlc")).isDirectory();
+  } catch {
+    return false;
+  }
+}
+function projects() {
+  const stored = readProjects(DATA_DIR).filter((project) => isWorkspace(project.root));
+  if (ENV_ROOT) {
+    const env = { root: path27.resolve(ENV_ROOT), name: path27.basename(path27.resolve(ENV_ROOT)) };
+    if (!stored.some((project) => project.root === env.root))
+      return [env, ...stored];
+  }
+  return stored;
+}
+function pickProject(wanted) {
+  const all = projects();
+  if (all.length === 0)
+    throw new Refusal("no-project", 409);
+  if (!wanted)
+    return all[0];
+  const match = all.find((project) => project.root === wanted || project.name === wanted);
+  if (!match)
+    throw new Refusal("no-project", 404);
+  if (!isWorkspace(match.root))
+    throw new Refusal("not-a-workspace", 400);
+  return match;
+}
+function model(root) {
+  const assembled = assemble(root);
+  const { usage, ...payload } = assembled;
+  return payload;
+}
+function view(root, rel) {
+  if (!rel)
+    throw new Refusal("missing-param", 400);
+  const resolved = resolveState(root);
+  if (resolved.kind !== "ok")
+    throw new Refusal("no-run", 404);
+  const recordDir = path27.dirname(path27.join(root, resolved.rel));
+  return readArtifactSource(artifactBase(root, recordDir, rel), rel);
+}
+var queueCache;
+function queue() {
+  const now = Date.now();
+  if (queueCache && now - queueCache.at < 1e4)
+    return queueCache.rows;
+  const rows = [];
+  for (const project of projects().slice(0, 12)) {
+    try {
+      const m = assemble(project.root);
+      const blockers = m.blockers.slice(0, 5).map((b) => ({
+        stage: b.stage,
+        ...b.unit ? { unit: b.unit } : {},
+        heading: b.heading,
+        rel: b.rel,
+        ...b.waitingSec !== undefined ? { waitingSec: b.waitingSec } : {}
+      }));
+      rows.push({
+        root: project.root,
+        name: project.name,
+        record: m.identity.slug ?? m.identity.record,
+        pct: m.state.overallPct,
+        phase: m.state.lifecyclePhase,
+        blockers,
+        ...m.gates.awaitingStage ? { awaitingStage: m.gates.awaitingStage } : {},
+        guardRefusals: (m.signals?.guardRefusals ?? []).filter((r) => r.pendingAsk).length,
+        warnings: m.warnings.length,
+        findings: (m.reviews ?? []).reduce((n, r) => n + (r.findings ?? 0), 0)
+      });
+    } catch (err) {
+      rows.push({
+        root: project.root,
+        name: project.name,
+        blockers: [],
+        guardRefusals: 0,
+        warnings: 0,
+        findings: 0,
+        error: err instanceof Error ? err.message : String(err)
+      });
+    }
+  }
+  queueCache = { at: now, rows };
+  return rows;
+}
 function draftOf(value) {
   if (typeof value !== "object" || value === null)
     return;
@@ -4679,72 +4708,32 @@ function draftOf(value) {
     ...answer ? { answer } : {}
   };
 }
-async function readBody(req) {
-  return new Promise((resolve) => {
-    let body = "";
-    req.on("data", (chunk) => {
-      body += chunk;
-      if (body.length > 256 * 1024)
-        req.destroy();
-    });
-    req.on("end", () => {
-      try {
-        resolve(JSON.parse(body));
-      } catch {
-        resolve(undefined);
-      }
-    });
-    req.on("error", () => resolve(undefined));
+function readBody(req) {
+  const { promise, resolve } = Promise.withResolvers();
+  let body = "";
+  req.on("data", (chunk) => {
+    body += chunk;
+    if (body.length > 256 * 1024)
+      req.destroy();
   });
-}
-var ROOT = process.env.AIDLC_LEDGER_ROOT?.trim() || storedRoot();
-
-class Refusal extends Error {
-  code;
-  status;
-  constructor(code, status) {
-    super(code);
-    this.code = code;
-    this.status = status;
-  }
-}
-function json(res, status, body) {
-  const payload = JSON.stringify(body);
-  res.writeHead(status, {
-    "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store",
-    "content-length": Buffer.byteLength(payload)
+  req.on("end", () => {
+    try {
+      resolve(JSON.parse(body));
+    } catch {
+      resolve(undefined);
+    }
   });
-  res.end(payload);
+  req.on("error", () => resolve(undefined));
+  return promise;
 }
-function isWorkspace(root) {
-  try {
-    return fs29.statSync(`${root}/aidlc`).isDirectory();
-  } catch {
-    return false;
+function fail(res, err) {
+  if (err instanceof Refusal) {
+    json(res, err.status, { error: { code: err.code } });
+    return;
   }
-}
-function model() {
-  if (!ROOT)
-    throw new Refusal("no-workspace", 409);
-  if (!isWorkspace(ROOT))
-    throw new Refusal("not-a-workspace", 400);
-  const assembled = assemble(ROOT);
-  const { usage, ...payload } = assembled;
-  return payload;
-}
-function view(rel) {
-  if (!ROOT)
-    throw new Refusal("no-workspace", 409);
-  if (!isWorkspace(ROOT))
-    throw new Refusal("not-a-workspace", 400);
-  if (!rel)
-    throw new Refusal("missing-param", 400);
-  const resolved = resolveState(ROOT);
-  if (resolved.kind !== "ok")
-    throw new Refusal("no-run", 404);
-  const recordDir = path26.dirname(path26.join(ROOT, resolved.rel));
-  return readArtifactSource(artifactBase(ROOT, recordDir, rel), rel);
+  json(res, 500, {
+    error: { code: "read-failed", message: err instanceof Error ? err.message : String(err) }
+  });
 }
 var server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
@@ -4752,152 +4741,76 @@ var server = createServer(async (req, res) => {
     json(res, 200, { ok: true });
     return;
   }
-  const writeRoute = req.method === "POST" && (url.pathname === `${BASE}/workspace` || url.pathname === `${BASE}/decisions/preview` || url.pathname === `${BASE}/decisions/send`);
+  const writeRoute = req.method === "POST" && (url.pathname === `${BASE}/projects` || url.pathname === `${BASE}/decisions/preview`);
   if (!writeRoute && req.method !== "GET" && req.method !== "HEAD") {
     json(res, 405, { error: { code: "read-only" } });
     return;
   }
-  if (url.pathname === `${BASE}/mapping`) {
-    const slots = await listSlots();
-    if (!slots) {
-      json(res, 503, { error: { code: "no-gateway" } });
+  try {
+    if (url.pathname === `${BASE}/meta`) {
+      json(res, 200, { app: "aidlc-management-tool", projects: projects().length });
       return;
     }
-    const slot = ROOT ? slotForWorkspace(slots, ROOT) : undefined;
-    json(res, 200, {
-      slot: slot ? { key: slot.key, title: slot.title ?? null } : null,
-      count: slots.length
-    });
-    return;
-  }
-  if (url.pathname === `${BASE}/decisions` && req.method === "GET") {
-    json(res, 200, { records: [...sends.values()] });
-    return;
-  }
-  if (url.pathname === `${BASE}/decisions/preview` && req.method === "POST") {
-    const body = await readBody(req);
-    const draft = typeof body === "object" && body !== null && "draft" in body ? draftOf(body.draft) : draftOf(body);
-    if (!draft) {
-      json(res, 400, { error: { code: "invalid-decision" } });
-      return;
-    }
-    json(res, 200, { text: composeAnswer(draft), problems: validateDraft(draft) });
-    return;
-  }
-  if (url.pathname === `${BASE}/decisions/send` && req.method === "POST") {
-    const body = await readBody(req);
-    if (typeof body !== "object" || body === null || !("draft" in body)) {
-      json(res, 400, { error: { code: "invalid-decision" } });
-      return;
-    }
-    const draft = draftOf(body.draft);
-    if (!draft) {
-      json(res, 400, { error: { code: "invalid-decision" } });
-      return;
-    }
-    const problems = validateDraft(draft);
-    if (problems.length > 0) {
-      json(res, 400, { error: { code: "invalid-decision", problems } });
-      return;
-    }
-    const text = composeAnswer(draft);
-    const sendId = "sendId" in body && typeof body.sendId === "string" && body.sendId.length > 0 ? body.sendId : crypto.randomUUID();
-    const requestedSlot = "slot" in body && typeof body.slot === "string" && body.slot.length > 0 ? body.slot : undefined;
-    const started = beginSend(sends.get(sendId), { sendId, slotKey: "", text });
-    if (!started.send) {
-      json(res, 200, { record: started.record, replayed: true });
-      return;
-    }
-    let slot = requestedSlot;
-    if (!slot && ROOT) {
-      const slots = await listSlots();
-      slot = slots ? slotForWorkspace(slots, ROOT)?.key : undefined;
-    }
-    if (!slot) {
-      const refused = markRefused(started.record, "no-session");
-      sends.set(sendId, refused);
-      json(res, 409, { error: { code: "no-session" }, record: refused });
-      return;
-    }
-    const result = await sendChat({ message: text, slot, sendId });
-    const keyed = { ...started.record, slotKey: slot };
-    const record = result.ok ? markDelivered(keyed) : result.status !== undefined && result.status < 500 ? markRefused(keyed, `gateway-${result.status}`) : markUncertain(keyed, result.detail ?? "unconfirmed");
-    sends.set(sendId, record);
-    json(res, result.ok ? 200 : 502, { record, text });
-    return;
-  }
-  if (url.pathname === `${BASE}/workspace`) {
-    if (req.method === "POST") {
-      let body = "";
-      req.on("data", (chunk) => {
-        body += chunk;
-        if (body.length > 64 * 1024)
-          req.destroy();
-      });
-      req.on("end", () => {
-        try {
-          const doc = JSON.parse(body);
-          const root = typeof doc === "object" && doc !== null && "root" in doc && typeof doc.root === "string" ? doc.root.trim() : "";
-          if (!root || !isWorkspace(root)) {
-            json(res, 400, { error: { code: "not-a-workspace" } });
-            return;
-          }
-          fs29.mkdirSync(path26.dirname(WORKSPACE_FILE), { recursive: true });
-          fs29.writeFileSync(WORKSPACE_FILE, `${JSON.stringify({ root }, null, 2)}
-`);
-          ROOT = root;
-          json(res, 200, { root });
-        } catch {
-          json(res, 400, { error: { code: "bad-request" } });
+    if (url.pathname === `${BASE}/projects`) {
+      if (req.method === "POST") {
+        const body = await readBody(req);
+        const root = typeof body === "object" && body !== null && "root" in body && typeof body.root === "string" ? body.root.trim() : "";
+        if (!root || !isWorkspace(root)) {
+          json(res, 400, { error: { code: "not-a-workspace" } });
+          return;
         }
-      });
+        queueCache = undefined;
+        json(res, 200, { projects: addProject(DATA_DIR, root) });
+        return;
+      }
+      if (req.method === "DELETE") {
+        const root = url.searchParams.get("root");
+        if (root)
+          removeProject(DATA_DIR, root);
+        queueCache = undefined;
+        json(res, 200, { projects: projects() });
+        return;
+      }
+      const rows = projects().map((project) => ({
+        ...project,
+        summary: readWorkspaceSummary(project.root)
+      }));
+      json(res, 200, { projects: rows });
       return;
     }
-    json(res, 200, { root: ROOT ?? null });
-    return;
-  }
-  if (url.pathname === `${BASE}/meta`) {
-    json(res, 200, { app: "aidlc-ledger", root: ROOT ?? null });
-    return;
-  }
-  if (url.pathname === `${BASE}/view`) {
-    try {
-      const result = view(url.searchParams.get("rel"));
+    if (url.pathname === `${BASE}/queue`) {
+      json(res, 200, { rows: queue() });
+      return;
+    }
+    if (url.pathname === `${BASE}/model`) {
+      const project = pickProject(url.searchParams.get("project"));
+      json(res, 200, model(project.root));
+      return;
+    }
+    if (url.pathname === `${BASE}/view`) {
+      const project = pickProject(url.searchParams.get("project"));
+      const result = view(project.root, url.searchParams.get("rel"));
       const ok = typeof result === "object" && result !== null && "ok" in result && result.ok === true;
-      const status = ok || !(typeof result === "object" && result !== null && ("status" in result)) || typeof result.status !== "number" ? ok ? 200 : 400 : result.status;
-      json(res, status, result);
-    } catch (err) {
-      if (err instanceof Refusal) {
-        json(res, err.status, { error: { code: err.code } });
+      json(res, ok ? 200 : 400, result);
+      return;
+    }
+    if (url.pathname === `${BASE}/decisions/preview` && req.method === "POST") {
+      const body = await readBody(req);
+      const draft = typeof body === "object" && body !== null && "draft" in body ? draftOf(body.draft) : draftOf(body);
+      if (!draft) {
+        json(res, 400, { error: { code: "invalid-decision" } });
         return;
       }
-      json(res, 500, {
-        error: { code: "read-failed", message: err instanceof Error ? err.message : String(err) }
-      });
+      json(res, 200, { text: composeAnswer(draft), problems: validateDraft(draft) });
+      return;
     }
-    return;
+    json(res, 404, { error: { code: "not-found" } });
+  } catch (err) {
+    fail(res, err);
   }
-  if (url.pathname === `${BASE}/model`) {
-    try {
-      json(res, 200, model());
-    } catch (err) {
-      if (err instanceof Refusal) {
-        json(res, err.status, { error: { code: err.code } });
-        return;
-      }
-      json(res, 500, {
-        error: {
-          code: "read-failed",
-          message: err instanceof Error ? err.message : String(err)
-        }
-      });
-    }
-    return;
-  }
-  json(res, 404, { error: { code: "not-found" } });
 });
 server.listen(PORT, "127.0.0.1", () => {
   const address = server.address();
   const bound = address && typeof address === "object" ? address.port : PORT;
-  console.log(`[aidlc-ledger] backend on 127.0.0.1:${bound} root=${ROOT ?? "(none)"}`);
+  console.log(`[aidlc-management-tool] backend on 127.0.0.1:${bound} projects=${projects().length}`);
 });

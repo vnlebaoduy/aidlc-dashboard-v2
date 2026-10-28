@@ -1,7 +1,7 @@
 {
-  "name": "aidlc-ledger",
+  "name": "aidlc-management-tool",
   "version": "0.1.0",
-  "displayName": "AI-DLC Ledger",
+  "displayName": "AI-DLC Management Tool",
   "description": "Read-only analysis of an AI-DLC v2 run: what needs you, how far along it is, where the evidence sits, and what the engine actually did.",
   "author": "Le Bao Duy",
   "license": "MIT",
@@ -28,14 +28,14 @@
     "entryPoint": "backend/dist/server.js",
     "port": "auto",
     "healthCheck": "/health",
-    "routes": "/api/apps/aidlc-ledger"
+    "routes": "/api/apps/aidlc-management-tool"
   },
   "ui": {
     "entry": "dist/index.mjs",
     "pages": [
       {
-        "route": "/apps/aidlc-ledger",
-        "label": "AI-DLC Ledger"
+        "route": "/apps/aidlc-management-tool",
+        "label": "AI-DLC Management Tool"
       }
     ],
     "sidebar": {
@@ -45,7 +45,7 @@
   },
   "permissions": {
     "api": [
-      "/api/apps/aidlc-ledger"
+      "/api/apps/aidlc-management-tool"
     ],
     "events": [],
     "mcpTools": [],
