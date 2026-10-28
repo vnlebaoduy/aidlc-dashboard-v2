@@ -1,6 +1,7 @@
 // apps/kirocrew/backend/src/server.ts
-import * as fs27 from "node:fs";
+import * as fs28 from "node:fs";
 import { createServer } from "node:http";
+import * as path25 from "node:path";
 
 // server/model/assemble.ts
 import * as fs26 from "node:fs";
@@ -4410,6 +4411,43 @@ function assemble(root, harnessDir, usageCtx) {
   };
 }
 
+// server/scan/view-file.ts
+import * as fs27 from "node:fs";
+var MAX_VIEW_BYTES = 512 * 1024;
+function readArtifactSource(recordDir, rel) {
+  const jailed = resolveArtifact(recordDir, rel);
+  if (!jailed.ok)
+    return jailed;
+  let fd;
+  try {
+    const sizeBytes = fs27.statSync(jailed.real).size;
+    fd = fs27.openSync(jailed.real, "r");
+    const buf = Buffer.allocUnsafe(MAX_VIEW_BYTES);
+    const read = fs27.readSync(fd, buf, 0, MAX_VIEW_BYTES, 0);
+    const truncated = sizeBytes > read;
+    let text = buf.subarray(0, read).toString("utf-8");
+    if (truncated) {
+      const lastBreak = text.lastIndexOf(`
+`);
+      if (lastBreak > 0)
+        text = text.slice(0, lastBreak);
+    }
+    return { ok: true, source: { rel, text, truncated, sizeBytes, shownBytes: read } };
+  } catch (err) {
+    return {
+      ok: false,
+      refusal: { code: "read-failed", detail: err instanceof Error ? err.message : String(err) },
+      status: 500
+    };
+  } finally {
+    if (fd !== undefined) {
+      try {
+        fs27.closeSync(fd);
+      } catch {}
+    }
+  }
+}
+
 // apps/kirocrew/backend/src/server.ts
 var BASE = "/api/apps/aidlc-ledger";
 var PORT = Number(process.env.PORT ?? 0);
@@ -4435,7 +4473,7 @@ function json(res, status, body) {
 }
 function isWorkspace(root) {
   try {
-    return fs27.statSync(`${root}/aidlc`).isDirectory();
+    return fs28.statSync(`${root}/aidlc`).isDirectory();
   } catch {
     return false;
   }
@@ -4449,6 +4487,19 @@ function model() {
   const { usage, ...payload } = assembled;
   return payload;
 }
+function view(rel) {
+  if (!ROOT)
+    throw new Refusal("no-workspace", 409);
+  if (!isWorkspace(ROOT))
+    throw new Refusal("not-a-workspace", 400);
+  if (!rel)
+    throw new Refusal("missing-param", 400);
+  const resolved = resolveState(ROOT);
+  if (resolved.kind !== "ok")
+    throw new Refusal("no-run", 404);
+  const recordDir = path25.dirname(path25.join(ROOT, resolved.rel));
+  return readArtifactSource(artifactBase(ROOT, recordDir, rel), rel);
+}
 var server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   if (url.pathname === "/health") {
@@ -4461,6 +4512,23 @@ var server = createServer((req, res) => {
   }
   if (url.pathname === `${BASE}/meta`) {
     json(res, 200, { app: "aidlc-ledger", root: ROOT ?? null });
+    return;
+  }
+  if (url.pathname === `${BASE}/view`) {
+    try {
+      const result = view(url.searchParams.get("rel"));
+      const ok = typeof result === "object" && result !== null && "ok" in result && result.ok === true;
+      const status = ok || !(typeof result === "object" && result !== null && ("status" in result)) || typeof result.status !== "number" ? ok ? 200 : 400 : result.status;
+      json(res, status, result);
+    } catch (err) {
+      if (err instanceof Refusal) {
+        json(res, err.status, { error: { code: err.code } });
+        return;
+      }
+      json(res, 500, {
+        error: { code: "read-failed", message: err instanceof Error ? err.message : String(err) }
+      });
+    }
     return;
   }
   if (url.pathname === `${BASE}/model`) {

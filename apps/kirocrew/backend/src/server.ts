@@ -11,7 +11,11 @@
 
 import * as fs from "node:fs";
 import { type ServerResponse, createServer } from "node:http";
+import * as path from "node:path";
 import { assemble } from "../../../../server/model/assemble";
+import { artifactBase } from "../../../../server/scan/outcomes";
+import { resolveState } from "../../../../server/scan/resolve";
+import { readArtifactSource } from "../../../../server/scan/view-file";
 
 const BASE = "/api/apps/aidlc-ledger";
 const PORT = Number(process.env.PORT ?? 0);
@@ -20,7 +24,7 @@ const ROOT = process.env.AIDLC_LEDGER_ROOT?.trim() || undefined;
 /** A refusal the client can act on, mapped to its HTTP status. */
 class Refusal extends Error {
   constructor(
-    readonly code: "no-workspace" | "not-a-workspace",
+    readonly code: "no-workspace" | "not-a-workspace" | "missing-param" | "no-run",
     readonly status: number,
   ) {
     super(code);
@@ -55,6 +59,16 @@ function model(): Record<string, unknown> {
   return payload;
 }
 
+function view(rel: string | null): unknown {
+  if (!ROOT) throw new Refusal("no-workspace", 409);
+  if (!isWorkspace(ROOT)) throw new Refusal("not-a-workspace", 400);
+  if (!rel) throw new Refusal("missing-param", 400);
+  const resolved = resolveState(ROOT);
+  if (resolved.kind !== "ok") throw new Refusal("no-run", 404);
+  const recordDir = path.dirname(path.join(ROOT, resolved.rel));
+  return readArtifactSource(artifactBase(ROOT, recordDir, rel), rel);
+}
+
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   if (url.pathname === "/health") {
@@ -67,6 +81,31 @@ const server = createServer((req, res) => {
   }
   if (url.pathname === `${BASE}/meta`) {
     json(res, 200, { app: "aidlc-ledger", root: ROOT ?? null });
+    return;
+  }
+  if (url.pathname === `${BASE}/view`) {
+    try {
+      const result = view(url.searchParams.get("rel"));
+      const ok =
+        typeof result === "object" && result !== null && "ok" in result && result.ok === true;
+      const status =
+        ok ||
+        !(typeof result === "object" && result !== null && "status" in result) ||
+        typeof result.status !== "number"
+          ? ok
+            ? 200
+            : 400
+          : result.status;
+      json(res, status, result);
+    } catch (err) {
+      if (err instanceof Refusal) {
+        json(res, err.status, { error: { code: err.code } });
+        return;
+      }
+      json(res, 500, {
+        error: { code: "read-failed", message: err instanceof Error ? err.message : String(err) },
+      });
+    }
     return;
   }
   if (url.pathname === `${BASE}/model`) {

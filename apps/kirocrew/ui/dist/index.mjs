@@ -125,12 +125,43 @@ function Decisions({ m }) {
   }, h("div", { style: { fontWeight: 600, fontSize: 13 } }, item.item), h("div", { style: { color: T.muted, fontSize: 12 } }, `${item.unit ? `${item.unit} · ` : ""}${item.stage} → ${item.assignment}`))))));
 }
 function Sources({ m }) {
+  const [opened, setOpened] = useState(null);
   const provenance = Object.values(m.provenance ?? {});
   const knowledge = m.knowledge;
+  function open(rel) {
+    setOpened({ rel, status: "loading" });
+    fetch(`${BASE}/view?rel=${encodeURIComponent(rel)}`, { cache: "no-store" }).then(async (res) => {
+      const body = await res.json();
+      setOpened(body?.ok ? { rel, text: body.source?.text ?? "" } : { rel, error: body?.refusal?.code ?? body?.error?.code ?? "refused" });
+    }).catch(() => setOpened({ rel, error: "unreachable" }));
+  }
   return h("div", { style: { display: "grid", gap: 16 } }, h(Card, { title: "Freshness of each input" }, h("ul", { style: { margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 6 } }, provenance.map((p) => h("li", {
     key: p.source,
     style: { display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13 }
-  }, h("span", { style: { fontWeight: 600 } }, p.source), h("span", { style: { color: p.stale ? T.warning : T.success } }, p.stale ? "stale" : "fresh"))))), knowledge ? h(Card, { title: "Knowledge inputs" }, h(Muted, null, `${knowledge.documentFiles} documents`), knowledge.indexedDocuments !== undefined ? h(Muted, null, `${knowledge.indexedDocuments} indexed · ${knowledge.tombstones ?? 0} tombstones`) : h(Muted, null, "No catalog index"), knowledge.memoryFiles.length > 0 ? h(Muted, null, `rules: ${knowledge.memoryFiles.join(", ")}`) : null, knowledge.codekbRepos.length > 0 ? h(Muted, null, `code knowledge: ${knowledge.codekbRepos.join(", ")}`) : null) : null, h(Card, { title: "Reviewer passes" }, (m.reviews ?? []).length === 0 ? h(Muted, null, "No reviewer pass recorded.") : h("ul", { style: { margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 6 } }, (m.reviews ?? []).map((r) => h("li", { key: r.rel, style: { fontSize: 13 } }, `${r.unit ? `${r.unit} · ` : ""}${r.stage} #${r.number} · ${r.verdict ?? "—"}${r.findings ? ` · ${r.findings} findings` : ""}`)))), h(Card, { title: "Execution record" }, m.runtime ? h(Muted, null, `${m.runtime.stages.length} stages from runtime-graph`) : h(Muted, null, "runtime-graph.json is not present in this clone"), m.plan ? h(Muted, null, `plan: ${m.plan.filter((p) => p.action === "EXECUTE").length} execute · ${m.plan.filter((p) => p.action === "SKIP").length} skip`) : null, m.plugins ? h(Muted, null, `plugins: ${m.plugins.enabled.join(", ") || "—"}`) : null));
+  }, h("span", { style: { fontWeight: 600 } }, p.source), h("span", { style: { color: p.stale ? T.warning : T.success } }, p.stale ? "stale" : "fresh"))))), knowledge ? h(Card, { title: "Knowledge inputs" }, h(Muted, null, `${knowledge.documentFiles} documents`), knowledge.indexedDocuments !== undefined ? h(Muted, null, `${knowledge.indexedDocuments} indexed · ${knowledge.tombstones ?? 0} tombstones`) : h(Muted, null, "No catalog index"), knowledge.memoryFiles.length > 0 ? h(Muted, null, `rules: ${knowledge.memoryFiles.join(", ")}`) : null, knowledge.codekbRepos.length > 0 ? h(Muted, null, `code knowledge: ${knowledge.codekbRepos.join(", ")}`) : null) : null, h(Card, { title: "Reviewer passes" }, (m.reviews ?? []).length === 0 ? h(Muted, null, "No reviewer pass recorded.") : h("ul", { style: { margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 6 } }, (m.reviews ?? []).map((r) => h("li", { key: r.rel, style: { fontSize: 13 } }, `${r.unit ? `${r.unit} · ` : ""}${r.stage} #${r.number} · ${r.verdict ?? "—"}${r.findings ? ` · ${r.findings} findings` : ""} · `, h("button", {
+    type: "button",
+    onClick: () => open(r.rel),
+    style: {
+      border: "none",
+      background: "none",
+      padding: 0,
+      color: T.blue,
+      font: "inherit",
+      textDecoration: "underline",
+      textUnderlineOffset: 4,
+      cursor: "pointer"
+    }
+  }, r.rel.split("/").pop() ?? r.rel))))), opened ? h(Card, { title: opened.rel }, opened.status === "loading" ? h(Muted, null, "Reading…") : opened.error ? h(Muted, null, `Refused: ${opened.error}`) : h("pre", {
+    style: {
+      margin: 0,
+      maxHeight: 420,
+      overflow: "auto",
+      fontSize: 12,
+      lineHeight: "18px",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    }
+  }, opened.text)) : null, h(Card, { title: "Execution record" }, m.runtime ? h(Muted, null, `${m.runtime.stages.length} stages from runtime-graph`) : h(Muted, null, "runtime-graph.json is not present in this clone"), m.plan ? h(Muted, null, `plan: ${m.plan.filter((p) => p.action === "EXECUTE").length} execute · ${m.plan.filter((p) => p.action === "SKIP").length} skip`) : null, m.plugins ? h(Muted, null, `plugins: ${m.plugins.enabled.join(", ") || "—"}`) : null));
 }
 var BODY = {
   overview: Overview,

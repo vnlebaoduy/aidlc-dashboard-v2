@@ -62,7 +62,9 @@ Build the app's pages natively with `@kirocrew/app-sdk`, borrowing Studio's info
 - [x] Overview shows the needs-you list, gate count, findings and the guard-refusal warning; Stages matches artifacts and runtime durations; Timeline lists spans; Decisions reports ledger counts and items; Sources shows provenance, knowledge, reviews, plugins and the execution record.
 - [x] Data comes only from `/api/apps/aidlc-ledger/model`; the bundle keeps `react`, `react-dom/client` and `lucide-react` external to the host import map.
 - [x] Verified by server-rendering against `fixtures/reference` (6 tests) and by a browser harness that clicked every tab (1440 and 375, no horizontal overflow). The host shell itself is still unverified.
-- [ ] Evidence drawer and `/view` route in the app; host chrome checks; store screenshots.
+- [x] The app backend answers `/api/apps/aidlc-ledger/view?rel=` through the shared artifact jail, and Sources opens a review's text inline.
+- [x] Verified end to end without the host: real Node backend + built bundle + harness proxy; clicking a review returned the file text (HTTP 200 both routes).
+- [ ] Host chrome checks (needs KiroCrew) and store screenshots.
 
 ## Risk Assessment
 

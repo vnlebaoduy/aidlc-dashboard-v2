@@ -338,8 +338,24 @@ function Decisions({ m }) {
 }
 
 function Sources({ m }) {
+  const [opened, setOpened] = useState(null);
   const provenance = Object.values(m.provenance ?? {});
   const knowledge = m.knowledge;
+
+  function open(rel) {
+    setOpened({ rel, status: "loading" });
+    fetch(`${BASE}/view?rel=${encodeURIComponent(rel)}`, { cache: "no-store" })
+      .then(async (res) => {
+        const body = await res.json();
+        setOpened(
+          body?.ok
+            ? { rel, text: body.source?.text ?? "" }
+            : { rel, error: body?.refusal?.code ?? body?.error?.code ?? "refused" },
+        );
+      })
+      .catch(() => setOpened({ rel, error: "unreachable" }));
+  }
+
   return h(
     "div",
     { style: { display: "grid", gap: 16 } },
@@ -400,11 +416,54 @@ function Sources({ m }) {
                 { key: r.rel, style: { fontSize: 13 } },
                 `${r.unit ? `${r.unit} · ` : ""}${r.stage} #${r.number} · ${r.verdict ?? "—"}${
                   r.findings ? ` · ${r.findings} findings` : ""
-                }`,
+                } · `,
+                h(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: () => open(r.rel),
+                    style: {
+                      border: "none",
+                      background: "none",
+                      padding: 0,
+                      color: T.blue,
+                      font: "inherit",
+                      textDecoration: "underline",
+                      textUnderlineOffset: 4,
+                      cursor: "pointer",
+                    },
+                  },
+                  r.rel.split("/").pop() ?? r.rel,
+                ),
               ),
             ),
           ),
     ),
+    opened
+      ? h(
+          Card,
+          { title: opened.rel },
+          opened.status === "loading"
+            ? h(Muted, null, "Reading…")
+            : opened.error
+              ? h(Muted, null, `Refused: ${opened.error}`)
+              : h(
+                  "pre",
+                  {
+                    style: {
+                      margin: 0,
+                      maxHeight: 420,
+                      overflow: "auto",
+                      fontSize: 12,
+                      lineHeight: "18px",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                    },
+                  },
+                  opened.text,
+                ),
+        )
+      : null,
     h(
       Card,
       { title: "Execution record" },
