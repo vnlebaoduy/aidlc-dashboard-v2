@@ -1,0 +1,9 @@
+[
+  {
+    "name": "aidlc-ledger",
+    "gitUrl": "https://github.com/vnlebaoduy/aidlc-dashboard-v2",
+    "repo": "https://github.com/vnlebaoduy/aidlc-dashboard-v2",
+    "branch": "main",
+    "subdirectory": "apps/kirocrew"
+  }
+]
