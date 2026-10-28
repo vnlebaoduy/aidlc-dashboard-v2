@@ -62,5 +62,23 @@
     ],
     "installMode": "server",
     "requiresDesktopApp": false
-  }
+  },
+  "screenshots": [
+    "assets/screenshots/overview-light.png",
+    "assets/screenshots/stages-light.png",
+    "assets/screenshots/sources-light.png"
+  ],
+  "screenshotsDark": [
+    "assets/screenshots/overview-dark.png",
+    "assets/screenshots/stages-dark.png",
+    "assets/screenshots/sources-dark.png"
+  ],
+  "useCases": [
+    "See what an AI-DLC v2 run is waiting on you for, with the evidence beside it",
+    "Check whether a stage's artifacts are actually complete before approving a gate",
+    "Read a reviewer verdict and its findings without leaving the workspace"
+  ],
+  "configuration": [
+    "Choose the AI-DLC v2 workspace inside the app; reads are read-only"
+  ]
 }

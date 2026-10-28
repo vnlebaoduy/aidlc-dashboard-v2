@@ -43,7 +43,8 @@ Publish `AI-DLC Ledger` to the Kiro Crew App Store with its own identity, assets
 
 - [x] `apps/kirocrew/assets/icon-512.png`: 512×512, RGB with no alpha channel (opaque), yellow aperture-and-ledger mark on ink; `icon.svg` kept as the source.
 - [x] `app.json` declares `iconPath`.
-- [ ] Screenshots, listing copy, registry entry, review.
+- [x] Six screenshots (Overview, Stages, Sources × light/dark) captured at 1500×1000 from the built bundle, plus use cases and a configuration line in `app.json`.
+- [ ] Registry entry and review (needs KiroCrew for install verification).
 
 ## Risk Assessment
 
