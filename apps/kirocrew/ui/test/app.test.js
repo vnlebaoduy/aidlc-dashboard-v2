@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import * as path from "node:path";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { assemble } from "../../../../server/model/assemble";
-import { createElement } from "react";
-import LedgerPage, { App } from "../src/index.js";
+import LedgerPage, { App, Fleet, Queue } from "../src/index.js";
 
 // The host shell is not on this machine, so the page logic is proven where it can
 // be: the same component tree, server-rendered against the reference fixture. This
@@ -16,7 +16,7 @@ function render(tab) {
   return renderToStaticMarkup(App({ model, tab }));
 }
 
-describe("AI-DLC Ledger pages", () => {
+describe("AI-DLC Management Tool pages", () => {
   test("overview shows the run identity, progress and the needs-you list", () => {
     const html = render("overview");
     expect(html).toContain(model.identity.slug ?? model.identity.record);
@@ -56,6 +56,15 @@ describe("AI-DLC Ledger pages", () => {
     expect(html).toContain("Answer the open gate");
     expect(html).toContain("Looking for this workspace");
     expect(html).toContain("disabled");
+  });
+
+  test("fleet and queue render before their data arrives", () => {
+    const fleet = renderToStaticMarkup(createElement(Fleet, { onOpen: () => {} }));
+    expect(fleet).toContain("Projects");
+    expect(fleet).toContain("Reading projects");
+    const queue = renderToStaticMarkup(createElement(Queue, { onOpen: () => {} }));
+    expect(queue).toContain("Queue");
+    expect(queue).toContain("Reading every project");
   });
 
   test("the default export is the page component the host renders", () => {

@@ -763,6 +763,258 @@ function Sources({ m }) {
   );
 }
 
+function projectLabel(project) {
+  const parent = project.root.split("/").filter(Boolean).slice(-2, -1)[0] ?? "";
+  return parent ? `${project.name} · ${parent}` : project.name;
+}
+
+export function Fleet({ onOpen }) {
+  const [rows, setRows] = useState(null);
+  const [value, setValue] = useState("");
+  const [error, setError] = useState(null);
+
+  function load() {
+    fetch(`${BASE}/projects`, { cache: "no-store" })
+      .then(async (res) => setRows(res.ok ? ((await res.json()).projects ?? []) : []))
+      .catch(() => setRows([]));
+  }
+  useEffect(load, []);
+
+  function add(event) {
+    event.preventDefault();
+    setError(null);
+    fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ root: value }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setError(body?.error?.code ?? "refused");
+          return;
+        }
+        setValue("");
+        load();
+      })
+      .catch(() => setError("unreachable"));
+  }
+
+  function remove(root) {
+    fetch(`${BASE}/projects?root=${encodeURIComponent(root)}`, { method: "DELETE" })
+      .then(load)
+      .catch(() => setError("unreachable"));
+  }
+
+  return h(
+    "div",
+    { style: { display: "grid", gap: 16 } },
+    h("h1", { style: { margin: 0, fontSize: 24, fontWeight: 600, color: T.fg } }, "Projects"),
+    h(
+      "form",
+      { onSubmit: add, style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+      h("input", {
+        value,
+        onChange: (event) => setValue(event.target.value),
+        placeholder: "/home/you/work/project",
+        "aria-label": "Workspace path",
+        style: {
+          flex: "1 1 320px",
+          minWidth: 240,
+          padding: "8px 10px",
+          borderRadius: 4,
+          border: `1px solid ${T.border}`,
+          background: T.card,
+          color: T.fg,
+          font: "inherit",
+        },
+      }),
+      h(
+        "button",
+        {
+          type: "submit",
+          style: {
+            padding: "8px 14px",
+            borderRadius: 4,
+            border: "none",
+            background: T.primary,
+            color: T.primaryFg,
+            fontWeight: 600,
+            cursor: "pointer",
+          },
+        },
+        "Read this workspace",
+      ),
+    ),
+    error
+      ? h("p", { style: { margin: 0, color: T.warning, fontSize: 13 } }, `Not added: ${error}`)
+      : null,
+    rows === null
+      ? h(Muted, null, "Reading projects…")
+      : rows.length === 0
+        ? h(Muted, null, "No project registered yet. Add one above.")
+        : h(
+            "ul",
+            { style: { margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 8 } },
+            rows.map((row) => {
+              const summary = row.summary ?? {};
+              const ok = summary.kind === "ok";
+              return h(
+                "li",
+                { key: row.root, style: { ...cardStyle(), display: "grid", gap: 6 } },
+                h(
+                  "div",
+                  { style: { display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" } },
+                  h(
+                    "button",
+                    {
+                      type: "button",
+                      onClick: () => onOpen(row.root),
+                      style: {
+                        border: "none",
+                        background: "none",
+                        padding: 0,
+                        color: T.fg,
+                        font: "inherit",
+                        fontSize: 15,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        textUnderlineOffset: 4,
+                      },
+                    },
+                    projectLabel(row),
+                  ),
+                  h(
+                    Muted,
+                    null,
+                    ok
+                      ? `${summary.progress.lifecyclePhase} · ${summary.progress.pct}% · ${summary.progress.currentStageDisplay || summary.progress.currentStage}`
+                      : summary.kind === "no-run"
+                        ? "no run recorded"
+                        : "cannot read",
+                  ),
+                  ok && summary.blockers.count > 0
+                    ? h(
+                        "span",
+                        { style: { color: T.warning, fontSize: 12, fontWeight: 600 } },
+                        `${summary.blockers.count} blockers`,
+                      )
+                    : null,
+                  h(
+                    "button",
+                    {
+                      type: "button",
+                      onClick: () => remove(row.root),
+                      "aria-label": `Remove ${row.name}`,
+                      style: {
+                        marginLeft: "auto",
+                        border: "none",
+                        background: "none",
+                        color: T.muted,
+                        font: "inherit",
+                        fontSize: 12,
+                        cursor: "pointer",
+                      },
+                    },
+                    "Remove",
+                  ),
+                ),
+                h(Muted, null, row.root),
+              );
+            }),
+          ),
+  );
+}
+
+export function Queue({ onOpen }) {
+  const [rows, setRows] = useState(null);
+  useEffect(() => {
+    fetch(`${BASE}/queue`, { cache: "no-store" })
+      .then(async (res) => setRows(res.ok ? ((await res.json()).rows ?? []) : []))
+      .catch(() => setRows([]));
+  }, []);
+  if (!rows)
+    return h(
+      "div",
+      { style: { display: "grid", gap: 16 } },
+      h("h1", { style: { margin: 0, fontSize: 24, fontWeight: 600, color: T.fg } }, "Queue"),
+      h(Muted, null, "Reading every project…"),
+    );
+  const needs = rows.filter(
+    (row) => row.awaitingStage || row.blockers.length > 0 || row.guardRefusals > 0 || row.error,
+  );
+  return h(
+    "div",
+    { style: { display: "grid", gap: 16 } },
+    h("h1", { style: { margin: 0, fontSize: 24, fontWeight: 600, color: T.fg } }, "Queue"),
+    h(Muted, null, "Everything across your projects that is waiting on a person."),
+    needs.length === 0
+      ? h(Muted, null, "Nothing is waiting on you across these projects.")
+      : h(
+          "ul",
+          { style: { margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 } },
+          needs.map((row) =>
+            h(
+              "li",
+              { key: row.root, style: { ...cardStyle(), display: "grid", gap: 6 } },
+              h(
+                "div",
+                { style: { display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" } },
+                h(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: () => onOpen(row.root),
+                    style: {
+                      border: "none",
+                      background: "none",
+                      padding: 0,
+                      color: T.fg,
+                      font: "inherit",
+                      fontWeight: 600,
+                      textDecoration: "underline",
+                      textUnderlineOffset: 4,
+                      cursor: "pointer",
+                    },
+                  },
+                  projectLabel(row),
+                ),
+                h(Muted, null, row.record ?? "—"),
+                row.awaitingStage
+                  ? h(
+                      "span",
+                      { style: { color: T.warning, fontSize: 12, fontWeight: 600 } },
+                      `gate · ${row.awaitingStage}`,
+                    )
+                  : null,
+                row.guardRefusals > 0
+                  ? h(
+                      "span",
+                      { style: { color: T.warning, fontSize: 12, fontWeight: 600 } },
+                      `${row.guardRefusals} guard`,
+                    )
+                  : null,
+              ),
+              row.error
+                ? h(Muted, null, `not readable: ${row.error}`)
+                : h(
+                    "ul",
+                    { style: { margin: 0, paddingLeft: 18, display: "grid", gap: 2 } },
+                    row.blockers.map((b) =>
+                      h(
+                        "li",
+                        { key: `${b.rel}#${b.heading}`, style: { fontSize: 13, color: T.fg } },
+                        `${b.unit ? `${b.unit} · ` : ""}${b.stage} · ${b.heading}`,
+                      ),
+                    ),
+                  ),
+            ),
+          ),
+        ),
+  );
+}
+
 const BODY = {
   overview: Overview,
   stages: Stages,
@@ -1002,7 +1254,7 @@ export default function LedgerPage() {
         },
       },
       projects.map((project) =>
-        h("option", { key: project.root, value: project.root }, project.name),
+        h("option", { key: project.root, value: project.root }, projectLabel(project)),
       ),
     ),
     h(
